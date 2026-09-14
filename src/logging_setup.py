@@ -97,7 +97,8 @@ def get_log_path() -> Path:
 # آمار اجرای فعلی (سراسری)
 _run_stats: Dict[str, Any] = {
     "phases": [],                # لیست فازها با زمان شروع/پایان
-    "api_stats": defaultdict(lambda: {"calls": 0, "success": 0, "failed": 0, "cached": 0}),
+    # V1.3.3: هر وضعیت (success/failed/cached/skipped/rate_limited/...) بدون KeyError
+    "api_stats": defaultdict(lambda: defaultdict(int)),
     "errors": [],                # لیست خطاها
     "coins_real_data": 0,        # تعداد کوین‌های با داده واقعی
     "coins_proxy_only": 0,       # تعداد کوین‌های فقط پروکسی
@@ -212,7 +213,7 @@ def record_data_source(is_real: bool) -> None:
 def get_run_summary() -> Dict[str, Any]:
     """دریافت خلاصه کامل اجرا."""
     # تبدیل defaultdict به dict معمولی
-    api_stats_dict = {k: dict(v) for k, v in _run_stats["api_stats"].items()}
+    api_stats_dict = {k: dict(v) for k, v in _run_stats["api_stats"].items()}  # defaultdict → dict
     return {
         "phases": _run_stats["phases"],
         "api_stats": api_stats_dict,
@@ -280,7 +281,7 @@ def reset_run_stats() -> None:
     global _run_stats
     _run_stats = {
         "phases": [],
-        "api_stats": defaultdict(lambda: {"calls": 0, "success": 0, "failed": 0, "cached": 0}),
+        "api_stats": defaultdict(lambda: defaultdict(int)),  # V1.3.3
         "errors": [],
         "coins_real_data": 0,
         "coins_proxy_only": 0,

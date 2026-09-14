@@ -176,6 +176,23 @@ python scripts/release.py cleanup        # حذف نسخه‌های قدیمی
 ## 📦 تاریخچه نسخه‌ها
 
 
+
+### V1.3.3 - 2026-09-14 - Patch (رفع کرش skipped + Binance 451)
+
+#### 🐛 رفع باگ
+- **KeyError: 'skipped'**: در `record_api_call` وقتی Binance در دسترس نبود، وضعیت `skipped` در دیکشنری آمار وجود نداشت و **کل تحلیل هر کوین** با خطا متوقف می‌شد → نتیجه اسکن: ۰ کوین.
+- آمار API حالا با `defaultdict(int)` هر وضعیتی را می‌پذیرد (skipped / rate_limited / ...).
+
+#### 🌍 Binance روی GitHub Actions
+- HTTP **451** (geo-block) بدون ۵ بار retry طولانی → بلافاصله `None` و ادامه با داده CoinGecko.
+- پیش‌فرض endpoint: `https://data-api.binance.vision` (کمتر مسدود می‌شود).
+- اسکن حتی بدون Binance هم نتایج واقعی از CoinGecko می‌دهد.
+
+#### ✅ تست
+- ۱۰۰ تست پاس، شامل تست جدید `test_logging_stats`.
+
+---
+
 ### V1.3.2 - 2026-09-14 - Patch (رفع کرش ATR)
 
 #### 🐛 رفع باگ

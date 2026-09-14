@@ -102,7 +102,13 @@ class BinanceClient:
         self._available_symbols: Optional[set] = None
 
     def _get(self, base_url: str, path: str, params: Optional[dict] = None) -> Any:
-        """درخواست GET با rate limiter و retry."""
+        """درخواست GET با rate limiter و retry.
+
+        V1.3.3:
+        - 451 (Unavailable For Legal Reasons / geo-block) → بدون retry، None
+        - 400 → نماد نامعتبر، None
+        - سایر خطاها با تعداد محدود retry
+        """
         url = f"{base_url}{path}"
         last_error: Optional[Exception] = None
         for attempt in range(1, settings.MAX_RETRIES + 1):
@@ -119,10 +125,18 @@ class BinanceClient:
                 if resp.status_code == 400:
                     # نماد نامعتبر یا لیست نشده
                     return None
+                if resp.status_code in (418, 451):
+                    # geo-block / legal restriction (رایج روی GitHub Actions)
+                    logger.warning(
+                        "Binance blocked (HTTP %s) — ادامه بدون داده واقعی: %s",
+                        resp.status_code, url,
+                    )
+                    return None
                 resp.raise_for_status()
                 return resp.json()
             except requests.exceptions.HTTPError as exc:
-                if resp.status_code == 400:
+                code = getattr(resp, "status_code", None)
+                if code in (400, 418, 451):
                     return None
                 last_error = exc
                 logger.warning("Binance HTTP error attempt %d/%d: %s",

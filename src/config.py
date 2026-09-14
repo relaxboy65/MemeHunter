@@ -58,7 +58,7 @@ class Settings:
 
     # === Binance Public API (منبع داده واقعی OrderFlow/Liquidity) - V1.3.0 ===
     # کاملاً رایگان - بدون نیاز به کلید API
-    BINANCE_SPOT_URL: str = "https://api.binance.com"
+    BINANCE_SPOT_URL: str = "https://data-api.binance.vision"  # V1.3.3: کمتر geo-block
     BINANCE_FUTURES_URL: str = "https://fapi.binance.com"
     # فعال‌سازی لایه Binance برای کوین‌های لیست‌شده در CEX
     ENABLE_BINANCE: bool = True
