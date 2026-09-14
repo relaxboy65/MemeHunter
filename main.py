@@ -65,6 +65,7 @@ from src import (
     TelegramNotifier,
     format_telegram_message,
     notify_results,
+    cleanup_old_telegram_records,
     setup_logging,
     get_log_path,
     cleanup_old_logs,
@@ -658,6 +659,9 @@ def main() -> int:
 
     # پاکسازی رکوردهای قدیمی‌تر از 90 روز
     deleted = cleanup_old_db_records()
+    deleted_tg = cleanup_old_telegram_records()
+    if deleted_tg:
+        logger.info("%d رکورد قدیمی تلگرام حذف شد", deleted_tg)
     if deleted > 0:
         logger.info("%d رکورد قدیمی حذف شد", deleted)
     deleted_logs = cleanup_old_logs()
@@ -742,8 +746,9 @@ def main() -> int:
             results, paper_trading_stats=paper_stats, run_meta=run_meta
         )
         if ok:
-            print(f"\n✓ پیام تلگرام ارسال شد (message_id(ها)={msg_ids}).")
-            print("  برای ریپلای بعدی روی این پیام‌ها، idها در data/telegram_messages.csv ذخیره شدند.")
+            print(f"\n✓ پیام‌های تلگرام ارسال شد — تعداد: {len(msg_ids)} (هر ارز یک پیام جدا)")
+            print(f"  message_idها: {msg_ids}")
+            print("  مشخصات هر پیام در data/telegram_messages.csv ذخیره شد (برای ریپلای چک نتیجه).")
         else:
             notifier = TelegramNotifier()
             if not notifier.is_configured:
