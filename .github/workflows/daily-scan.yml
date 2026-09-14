@@ -1,6 +1,6 @@
 name: MemeHunter CI
 
-# نسخه: V1.3.3
+# نسخه: V1.4.0
 on:
   push:
     branches: [main, master]

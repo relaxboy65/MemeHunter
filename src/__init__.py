@@ -5,6 +5,7 @@ __init__.py
 from .config import settings, PROJECT_NAME, PROJECT_SLUG, PROJECT_VERSION
 from .coin_service import CoinGeckoClient, fetch_meme_candidates, enrich_with_history, FileCache
 from .binance_provider import BinanceClient, OrderFlowReal, LiquidityReal
+from .kucoin_provider import KuCoinClient, KuCoinAvailability
 from .dex_provider import DexScreenerClient, GeckoTerminalClient, DexPoolData
 from .indicators import (
     compute_indicators, IndicatorPack,
@@ -53,6 +54,13 @@ __all__ = [
     "fetch_meme_candidates",
     "enrich_with_history",
     "FileCache",
+    # kucoin
+    "KuCoinClient",
+    "KuCoinAvailability",
+    # binance
+    "BinanceClient",
+    "OrderFlowReal",
+    "LiquidityReal",
     # indicators
     "compute_indicators",
     "IndicatorPack",

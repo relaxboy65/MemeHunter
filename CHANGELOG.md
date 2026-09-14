@@ -4,6 +4,31 @@
 
 ---
 
+## [V1.4.0] - 2026-09-14
+
+### ✨ ویژگی جدید (Minor)
+- **KuCoin به‌عنوان اولویت اول داده واقعی**:
+  - OHLCV / تاریخچه قیمت از KuCoin candles (کاهش شدید rate-limit کوین‌جکو)
+  - Order Flow واقعی از recent trades کوکوین
+  - Liquidity واقعی از order book depth کوکوین
+  - Multi-timeframe از کندل‌های KuCoin
+- **CoinGecko فقط برای کشف کاندیدا** (دسته‌بندی meme) + پشتیبان تاریخچه
+- **Binance به‌عنوان پشتیبان** وقتی KuCoin نماد را ندارد یا داده ناقص است
+- تأخیر بین کوین‌ها کمتر وقتی تاریخچه از KuCoin آمده باشد
+- ماژول جدید `src/kucoin_provider.py` + تست‌های unit
+
+### 🔧 بهبود
+- لاگ‌ها منبع تاریخچه (kucoin / coingecko) را نمایش می‌دهند
+- شمارنده‌های `kucoin_available` و `history_kucoin` در خلاصه اجرا
+- برچسب‌های PROXY برای KuCoin در config
+
+### 📦 فایل‌ها
+- `src/kucoin_provider.py` (جدید)
+- `tests/test_kucoin_provider.py` (جدید)
+- به‌روزرسانی: `main.py`, `config.py`, `src/__init__.py`, `VERSION`, `README`, workflow
+
+---
+
 ## 📋 فهرست مطالب
 
 - [🔧 قوانین پروژه (Project Rules)](#-قوانین-پروژه-project-rules)

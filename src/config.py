@@ -3,6 +3,7 @@ config.py
 تنظیمات اصلی پروژه MemeHunter - ربات پیداکننده میم‌کوین
 Configuration for the MemeHunter bot.
 
+V1.4.0 - KuCoin به‌عنوان اولویت اول OHLCV / Liquidity / OrderFlow
 V1.3.0 - اضافه شدن منابع داده واقعی (Binance، DexScreener، GeckoTerminal)
          و برچسب «پروکسی/تقریبی» برای تحلیل‌های پیشرفته.
 """
@@ -56,7 +57,18 @@ class Settings:
     COINGECKO_API_KEY: str = os.getenv("COINGECKO_API_KEY", "")
     COINGECKO_API_KEY_HEADER: str = "x-cg-demo-api-key"
 
-    # === Binance Public API (منبع داده واقعی OrderFlow/Liquidity) - V1.3.0 ===
+    # === KuCoin Public API (اولویت ۱ برای OHLCV / Liquidity / OrderFlow) - V1.4.0 ===
+    # کاملاً رایگان - بدون نیاز به کلید API - محدودیت عمومی بالا
+    KUCOIN_BASE_URL: str = "https://api.kucoin.com"
+    ENABLE_KUCOIN: bool = True
+    # عمق order book (20 یا 100)
+    KUCOIN_DEPTH_LIMIT: int = 20
+    # آستانه حجم دلاری ترید بزرگ
+    KUCOIN_LARGE_TRADE_USD: float = 50_000.0
+    # اولویت استفاده از KuCoin برای تاریخچه به‌جای CoinGecko
+    PREFER_KUCOIN_HISTORY: bool = True
+
+    # === Binance Public API (پشتیبان OrderFlow/Liquidity) - V1.3.0 ===
     # کاملاً رایگان - بدون نیاز به کلید API
     BINANCE_SPOT_URL: str = "https://data-api.binance.vision"  # V1.3.3: کمتر geo-block
     BINANCE_FUTURES_URL: str = "https://fapi.binance.com"
@@ -134,12 +146,16 @@ class Settings:
     # این برچسب‌ها در تمام خروجی‌ها (HTML، تلگرام، لاگ) نمایش داده می‌شوند
     PROXY_LABELS: dict = field(default_factory=lambda: {
         "liquidity_cg": "پروکسی (CoinGecko volume-based)",
+        "liquidity_kucoin": "واقعی (KuCoin depth)",
         "liquidity_binance": "واقعی (Binance depth)",
         "sweep": "پروکسی (OHLC-based)",
         "orderflow_cg": "پروکسی (price-direction heuristic)",
+        "orderflow_kucoin": "واقعی (KuCoin trades CVD)",
         "orderflow_binance": "واقعی (Binance aggTrades CVD)",
         "smart_money": "پروکسی (large trades heuristic)",
         "volume_profile": "پروکسی (price-binned)",
+        "history_kucoin": "واقعی (KuCoin candles)",
+        "history_coingecko": "CoinGecko market_chart",
     })
 
     # === چند بازه زمانی (Multi-timeframe) ===

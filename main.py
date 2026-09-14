@@ -36,6 +36,8 @@ import json
 from datetime import datetime
 from typing import List, Dict, Any
 
+import requests
+
 # بارگذاری متغیرهای محیطی از فایل .env
 try:
     from dotenv import load_dotenv
@@ -87,6 +89,7 @@ from src import (
     get_run_summary,
 )
 from src.binance_provider import BinanceClient
+from src.kucoin_provider import KuCoinClient
 from src.paper_trading import (
     open_position, close_position, check_open_positions,
     get_paper_trading_stats, format_paper_trading_report,
@@ -123,7 +126,9 @@ def run_scan(limit: int = 50, advanced: bool = False,
         settings.ENABLE_ADVANCED_IMPACT = True
 
     client = CoinGeckoClient()
-    binance = BinanceClient() if real_data else None
+    # V1.4.0 - KuCoin اولویت اول؛ Binance پشتیبان
+    kucoin = KuCoinClient() if (real_data or settings.ENABLE_KUCOIN) else None
+    binance = BinanceClient() if (real_data and settings.ENABLE_BINANCE) else None
 
     # V1.3.1 - WebSocket اختیاری
     ws_manager = None
@@ -151,7 +156,7 @@ def run_scan(limit: int = 50, advanced: bool = False,
     # V1.3.1 - شروع فاز 1
     from src.logging_setup import start_phase, end_phase
     start_phase("fetch_candidates")
-    logger.info("=== مرحله 1: دریافت لیست میم‌کوین‌های کاندید ===")
+    logger.info("=== مرحله 1: دریافت لیست میم‌کوین‌های کاندید (CoinGecko) ===")
     candidates = fetch_meme_candidates(client, limit=limit)
     end_phase("fetch_candidates", {"candidates": len(candidates)})
     if not candidates:
@@ -160,9 +165,12 @@ def run_scan(limit: int = 50, advanced: bool = False,
 
     # V1.3.1 - شروع فاز 2
     start_phase("analyze_coins")
-    logger.info("=== مرحله 2: دریافت داده تاریخی و محاسبه اندیکاتورها ===")
+    logger.info("=== مرحله 2: داده تاریخی + اندیکاتور (اولویت KuCoin) ===")
     results: List[AnalysisResult] = []
+    kucoin_available_count = 0
     binance_available_count = 0
+    history_from_kucoin = 0
+    history_from_cg = 0
     errors_count = 0
     real_only_filtered = 0
 
@@ -173,7 +181,28 @@ def run_scan(limit: int = 50, advanced: bool = False,
         market_cap = coin.get("market_cap") or 0.0
         logger.info("[%d/%d] تحلیل %s (%s)...", idx, len(candidates), symbol, coin_id)
         try:
-            history = enrich_with_history(client, coin_id, days=settings.HISTORY_DAYS)
+            # V1.4.0 - اولویت تاریخچه: KuCoin → CoinGecko
+            history: Dict[str, Any] = {}
+            history_source = "none"
+            if kucoin is not None and settings.PREFER_KUCOIN_HISTORY:
+                try:
+                    kc_hist = kucoin.get_history_ohlcv(symbol, days=settings.HISTORY_DAYS)
+                    if kc_hist and len(kc_hist.get("prices", [])) >= 14:
+                        history = kc_hist
+                        history_source = "kucoin"
+                        history_from_kucoin += 1
+                        record_api_call("kucoin", "success", f"history {symbol}")
+                        logger.info("  تاریخچه از KuCoin (%d روز)", len(history["prices"]))
+                except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+                    record_api_call("kucoin", "failed", f"history {symbol}: {exc}")
+                    logger.debug("  KuCoin history failed: %s", exc)
+
+            if not history or len(history.get("prices", [])) < 14:
+                history = enrich_with_history(client, coin_id, days=settings.HISTORY_DAYS)
+                history_source = "coingecko"
+                history_from_cg += 1
+                record_api_call("coingecko", "success", f"history {symbol}")
+
             prices = history.get("prices", [])
             volumes = history.get("volumes", [])
             highs = history.get("highs", [])
@@ -185,14 +214,68 @@ def run_scan(limit: int = 50, advanced: bool = False,
             # محاسبه اندیکاتورهای اصلی
             indicators = compute_indicators(prices, volumes, highs=highs, lows=lows)
 
-            # V1.3.0 - دریافت داده واقعی از Binance (اگر فعال باشد)
+            # V1.4.0 - داده واقعی: اول KuCoin، بعد Binance
             real_orderflow = None
             real_liquidity = None
             mtf_data = None
             has_real_data = False
 
-            if binance is not None:
-                # V1.3.1 - بررسی موجود بودن نماد در Binance
+            if kucoin is not None:
+                start_phase(f"kucoin_check_{symbol}")
+                kc_avail = kucoin.is_available(symbol)
+                if kc_avail.available:
+                    kucoin_available_count += 1
+                    has_real_data = True
+                    record_api_call("kucoin", "success", f"{symbol} available")
+                    end_phase(f"kucoin_check_{symbol}", {"available": True})
+
+                    start_phase(f"kucoin_data_{symbol}")
+                    try:
+                        real_orderflow = kucoin.compute_orderflow(
+                            symbol, current_price, market_cap
+                        )
+                        if real_orderflow:
+                            logger.info("  OrderFlow KuCoin: CVD=%.2f, buy=%.1f%%",
+                                        real_orderflow.cvd,
+                                        real_orderflow.buy_pressure * 100)
+                            record_api_call("kucoin", "success", f"orderflow {symbol}")
+                    except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+                        record_api_call("kucoin", "failed", f"orderflow {symbol}: {exc}")
+                        logger.debug("  KuCoin orderflow failed: %s", exc)
+
+                    try:
+                        real_liquidity = kucoin.compute_liquidity(symbol)
+                        if real_liquidity:
+                            logger.info("  Liquidity KuCoin: spread=%.3f%%, imbalance=%+.2f",
+                                        real_liquidity.spread_pct,
+                                        real_liquidity.imbalance)
+                            record_api_call("kucoin", "success", f"liquidity {symbol}")
+                    except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+                        record_api_call("kucoin", "failed", f"liquidity {symbol}: {exc}")
+                        logger.debug("  KuCoin liquidity failed: %s", exc)
+
+                    if settings.ENABLE_MULTI_TIMEFRAME and not mtf_data:
+                        try:
+                            mtf_data = kucoin.get_multi_timeframe_data(
+                                symbol, settings.TIMEFRAMES
+                            )
+                            if mtf_data:
+                                record_api_call("kucoin", "success", f"mtf {symbol}")
+                        except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+                            record_api_call("kucoin", "failed", f"mtf {symbol}: {exc}")
+
+                    end_phase(f"kucoin_data_{symbol}", {
+                        "orderflow": bool(real_orderflow),
+                        "liquidity": bool(real_liquidity),
+                        "mtf": bool(mtf_data),
+                        "history": history_source,
+                    })
+                else:
+                    record_api_call("kucoin", "skipped", f"{symbol} not listed")
+                    end_phase(f"kucoin_check_{symbol}", {"available": False})
+
+            # پشتیبان Binance اگر KuCoin داده نداد
+            if binance is not None and (not has_real_data or real_orderflow is None or real_liquidity is None):
                 start_phase(f"binance_check_{symbol}")
                 availability = binance.is_available(symbol)
                 if availability.available:
@@ -201,51 +284,48 @@ def run_scan(limit: int = 50, advanced: bool = False,
                     record_api_call("binance", "success", f"{symbol} available")
                     end_phase(f"binance_check_{symbol}", {"available": True})
 
-                    # V1.3.1 - آستانه پویا با market_cap
                     start_phase(f"binance_data_{symbol}")
-                    try:
-                        real_orderflow = binance.compute_orderflow(
-                            symbol, current_price, market_cap
-                        )
-                        if real_orderflow:
-                            logger.info("  OrderFlow واقعی: CVD=%.2f, buy=%.1f%%",
-                                        real_orderflow.cvd,
-                                        real_orderflow.buy_pressure * 100)
-                            record_api_call("binance", "success", f"orderflow {symbol}")
-                    except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
-                        record_api_call("binance", "failed", f"orderflow {symbol}: {exc}")
-                        record_error("binance", str(exc), f"orderflow {symbol}")
-                        logger.debug("  Binance orderflow failed: %s", exc)
-
-                    try:
-                        real_liquidity = binance.compute_liquidity(symbol)
-                        if real_liquidity:
-                            logger.info("  Liquidity واقعی: spread=%.3f%%, imbalance=%+.2f",
-                                        real_liquidity.spread_pct,
-                                        real_liquidity.imbalance)
-                            record_api_call("binance", "success", f"liquidity {symbol}")
-                    except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
-                        record_api_call("binance", "failed", f"liquidity {symbol}: {exc}")
-                        record_error("binance", str(exc), f"liquidity {symbol}")
-                        logger.debug("  Binance liquidity failed: %s", exc)
-
-                    # داده چند بازه زمانی
-                    if settings.ENABLE_MULTI_TIMEFRAME:
+                    if real_orderflow is None:
                         try:
-                            mtf_data = binance.get_multi_timeframe_data(symbol, settings.TIMEFRAMES)
+                            real_orderflow = binance.compute_orderflow(
+                                symbol, current_price, market_cap
+                            )
+                            if real_orderflow:
+                                logger.info("  OrderFlow Binance: CVD=%.2f, buy=%.1f%%",
+                                            real_orderflow.cvd,
+                                            real_orderflow.buy_pressure * 100)
+                                record_api_call("binance", "success", f"orderflow {symbol}")
+                        except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+                            record_api_call("binance", "failed", f"orderflow {symbol}: {exc}")
+                            logger.debug("  Binance orderflow failed: %s", exc)
+
+                    if real_liquidity is None:
+                        try:
+                            real_liquidity = binance.compute_liquidity(symbol)
+                            if real_liquidity:
+                                logger.info("  Liquidity Binance: spread=%.3f%%, imbalance=%+.2f",
+                                            real_liquidity.spread_pct,
+                                            real_liquidity.imbalance)
+                                record_api_call("binance", "success", f"liquidity {symbol}")
+                        except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+                            record_api_call("binance", "failed", f"liquidity {symbol}: {exc}")
+                            logger.debug("  Binance liquidity failed: %s", exc)
+
+                    if settings.ENABLE_MULTI_TIMEFRAME and not mtf_data:
+                        try:
+                            mtf_data = binance.get_multi_timeframe_data(
+                                symbol, settings.TIMEFRAMES
+                            )
                             record_api_call("binance", "success", f"mtf {symbol}")
                         except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
                             record_api_call("binance", "failed", f"mtf {symbol}: {exc}")
-                            logger.debug("  Binance MTF failed: %s", exc)
 
-                    # V1.3.1 - WebSocket برای کوین‌های منتخب
-                    if ws_manager and idx <= 5:  # فقط 5 کوین اول
+                    if ws_manager and idx <= 5:
                         try:
                             ws_manager.start_coin_stream(symbol)
                             record_api_call("websocket", "success", f"stream {symbol}")
                         except (RuntimeError, OSError) as exc:
                             record_api_call("websocket", "failed", f"stream {symbol}: {exc}")
-                            logger.debug("  WebSocket failed: %s", exc)
 
                     end_phase(f"binance_data_{symbol}", {
                         "orderflow": bool(real_orderflow),
@@ -256,33 +336,30 @@ def run_scan(limit: int = 50, advanced: bool = False,
                     record_api_call("binance", "skipped", f"{symbol} not listed")
                     end_phase(f"binance_check_{symbol}", {"available": False})
 
-                    # V1.3.1 - استفاده از DexScreener برای میم‌های فقط-DEX
-                    if dex_client:
-                        try:
-                            start_phase(f"dex_data_{symbol}")
-                            dex_pool = dex_client.get_best_pool(symbol)
-                            if dex_pool:
-                                logger.info("  DEX pool: liquidity=$%.0f, vol24h=$%.0f",
-                                            dex_pool.liquidity_usd, dex_pool.volume_24h)
-                                record_api_call("dexscreener", "success", symbol)
-                                # V1.3.1 - استفاده از داده DEX به‌عنوان پروکسی لیکوییدیتی
-                                if not real_liquidity:
-                                    # ایجاد پروکسی از داده DEX
-                                    from src.advanced_analysis import LiquidityResult
-                                    real_liquidity = LiquidityResult(
-                                        avg_volume_30d=dex_pool.volume_24h,
-                                        liquidity_score=0.7 if dex_pool.liquidity_usd > 1_000_000 else 0.4,
-                                        is_liquid=dex_pool.liquidity_usd > 100_000,
-                                        spread_estimate=0.5 if dex_pool.liquidity_usd > 1_000_000 else 2.0,
-                                        is_real=False,
-                                        source="DexScreener pool",
-                                        proxy_label="پروکسی (DexScreener pool)",
-                                        notes=dex_pool.notes,
-                                    )
-                            end_phase(f"dex_data_{symbol}", {"found": bool(dex_pool)})
-                        except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
-                            record_api_call("dexscreener", "failed", f"{symbol}: {exc}")
-                            end_phase(f"dex_data_{symbol}", {"error": str(exc)})
+            # DexScreener فقط اگر هنوز liquidity واقعی نداریم
+            if dex_client and real_liquidity is None:
+                try:
+                    start_phase(f"dex_data_{symbol}")
+                    dex_pool = dex_client.get_best_pool(symbol)
+                    if dex_pool:
+                        logger.info("  DEX pool: liquidity=$%.0f, vol24h=$%.0f",
+                                    dex_pool.liquidity_usd, dex_pool.volume_24h)
+                        record_api_call("dexscreener", "success", symbol)
+                        from src.advanced_analysis import LiquidityResult
+                        real_liquidity = LiquidityResult(
+                            avg_volume_30d=dex_pool.volume_24h,
+                            liquidity_score=0.7 if dex_pool.liquidity_usd > 1_000_000 else 0.4,
+                            is_liquid=dex_pool.liquidity_usd > 100_000,
+                            spread_estimate=0.5 if dex_pool.liquidity_usd > 1_000_000 else 2.0,
+                            is_real=False,
+                            source="DexScreener pool",
+                            proxy_label="پروکسی (DexScreener pool)",
+                            notes=dex_pool.notes,
+                        )
+                    end_phase(f"dex_data_{symbol}", {"found": bool(dex_pool)})
+                except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+                    record_api_call("dexscreener", "failed", f"{symbol}: {exc}")
+                    end_phase(f"dex_data_{symbol}", {"error": str(exc)})
 
             # V1.3.1 - فیلتر --real-only
             if real_only and not has_real_data:
@@ -303,43 +380,52 @@ def run_scan(limit: int = 50, advanced: bool = False,
             result = analyze_coin(coin, indicators, advanced_pack=advanced_pack)
             results.append(result)
 
-            # لاگ تحلیل کوین به‌صورت JSON
             log_coin_analysis(symbol, coin_id, result.signal.value,
                               result.score, result.data_sources,
                               is_real_data=has_real_data)
 
-            logger.info("  سیگنال: %s | امتیاز: %.3f | داده‌ها: %s",
-                        result.signal.value, result.score, result.data_sources or "پایه")
+            logger.info("  سیگنال: %s | امتیاز: %.3f | تاریخچه: %s | داده‌ها: %s",
+                        result.signal.value, result.score, history_source,
+                        result.data_sources or "پایه")
         except (requests.exceptions.RequestException, ValueError, KeyError,
                 OSError, RuntimeError) as exc:
             errors_count += 1
             record_error("scan", str(exc), symbol)
             logger.error("  خطا در تحلیل %s: %s", symbol, exc)
-        time.sleep(settings.REQUEST_DELAY)
+        # V1.4.0 - تأخیر کمتر چون KuCoin محدودیت نرم‌تری دارد
+        delay = 0.4 if history_source == "kucoin" else settings.REQUEST_DELAY
+        time.sleep(delay)
 
     end_phase("analyze_coins", {
         "processed": len(results),
+        "kucoin_available": kucoin_available_count,
         "binance_available": binance_available_count,
+        "history_kucoin": history_from_kucoin,
+        "history_coingecko": history_from_cg,
         "errors": errors_count,
         "real_only_filtered": real_only_filtered,
     })
 
-    # V1.3.1 - توقف WebSocketها
     if ws_manager:
         ws_manager.stop_all()
         logger.info("تمام WebSocketها بسته شدند")
 
-    logger.info("=== تحلیل کامل شد. %d کوین پردازش شد. %d در Binance موجود. "
-                "%d فیلتر شده (real-only). %d خطا. ===",
-                len(results), binance_available_count, real_only_filtered, errors_count)
+    logger.info(
+        "=== تحلیل کامل شد. %d کوین | KuCoin=%d | Binance=%d | "
+        "تاریخچه KC=%d CG=%d | فیلتر real-only=%d | خطا=%d ===",
+        len(results), kucoin_available_count, binance_available_count,
+        history_from_kucoin, history_from_cg, real_only_filtered, errors_count,
+    )
 
-    # ثبت خلاصه JSON در لاگ
     log_run_summary({
         "total_coins": len(results),
         "buy_count": sum(1 for r in results if r.signal == Signal.BUY),
         "sell_count": sum(1 for r in results if r.signal == Signal.SELL),
         "hold_count": sum(1 for r in results if r.signal == Signal.HOLD),
+        "kucoin_available": kucoin_available_count,
         "binance_available": binance_available_count,
+        "history_kucoin": history_from_kucoin,
+        "history_coingecko": history_from_cg,
         "real_only_filtered": real_only_filtered,
         "errors": errors_count,
         "advanced_enabled": advanced,
@@ -683,9 +769,6 @@ def main() -> int:
     })
     return 0
 
-
-# import requests برای استفاده در except
-import requests.exceptions
 
 if __name__ == "__main__":
     sys.exit(main())
