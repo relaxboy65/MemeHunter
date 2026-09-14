@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reports (output)
+reports/
+*.log
+
+# Environment
+.env
+
+# Note: data/ folder is tracked selectively
+# activity.log files are git-ignored but coins_database.csv is tracked
+# cache/ is also ignored
+data/activity.log
+data/activity.log.*
+data/cache/
+
+# داده و لاگ — هرگز به گیت‌هاب نروند
+data/activity.log
+data/activity.log.*
+data/coins_database.csv
+data/paper_trades.csv
+data/cache/
+data/*.csv
+*.log
+
+# محیط و سیستم
+.env
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# خروجی گزارش
+reports/*
+!reports/.gitkeep
