@@ -1,175 +1,157 @@
 name: MemeHunter CI
 
-# نسخه: V1.3.0
-# CI کامل: lint + test + نسخه
+# نسخه: V1.3.2
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
   schedule:
-    # هر 6 ساعت یک‌بار اسکن دوره‌ای
     - cron: "0 0,6,12,18 * * *"
   workflow_dispatch:
+    inputs:
+      limit:
+        description: "حداکثر تعداد کوین"
+        required: false
+        default: "15"
+      advanced:
+        description: "تحلیل پیشرفته (true/false)"
+        required: false
+        default: "true"
+      send_telegram:
+        description: "ارسال به تلگرام (true/false)"
+        required: false
+        default: "true"
 
 permissions:
   contents: read
 
 jobs:
-  # ----------------------------------------------------------------- #
-  # Job 1: Lint کد پایتون
-  # ----------------------------------------------------------------- #
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     name: "Lint (pycodestyle)"
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install pycodestyle
         run: |
           python -m pip install --upgrade pip
           pip install pycodestyle
-
       - name: Run pycodestyle
         run: |
-          # بررسی سبک کد (خطاها فقط، نه هشدارها)
-          pycodestyle --max-line-length=120 --select=E9,F63,F7,F82 --show-source --show-pep8 src/ main.py || true
-          # بررسی خطاهای بحرانی
+          pycodestyle --max-line-length=120 --select=E9,F63,F7,F82 --show-source src/ main.py || true
           pycodestyle --max-line-length=120 --select=E9 src/ main.py
 
-  # ----------------------------------------------------------------- #
-  # Job 2: تست‌های واحد
-  # ----------------------------------------------------------------- #
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     name: "Tests (unittest + pytest)"
     needs: lint
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
+          pip install -r requirements.txt pytest
       - name: Run unit tests
-        env:
-          TELEGRAM_BOT_TOKEN: ""
-          TELEGRAM_CHAT_ID: ""
-        run: |
-          python -m unittest discover tests -v
-
-      - name: Run pytest (if installed)
+        run: python -m unittest discover tests -v
+      - name: Run pytest
         continue-on-error: true
-        run: |
-          pip install pytest
-          pytest tests/ -v --tb=short || true
+        run: pytest tests/ -v --tb=short || true
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ github.run_id }}
-          path: |
-            reports/
-            data/
-          retention-days: 7
-
-  # ----------------------------------------------------------------- #
-  # Job 3: بررسی نسخه
-  # ----------------------------------------------------------------- #
   version-check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     name: "Version Check"
     needs: test
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
+      - uses: actions/checkout@v4
       - name: Check VERSION file format
         run: |
           if [ ! -f VERSION ]; then
-            echo "❌ فایل VERSION موجود نیست"
+            echo "VERSION file missing"
             exit 1
           fi
           VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION || true)
           if [ -z "$VERSION" ]; then
-            echo "❌ فرمت VERSION نامعتبر است. باید V1.2.3 باشد"
+            echo "Invalid VERSION format"
             cat VERSION
             exit 1
           fi
-          echo "✓ نسخه صحیح: $VERSION"
-
-      - name: Check CHANGELOG has version entry
+          echo "Version OK: $VERSION"
+      - name: Check CHANGELOG entry
         run: |
           VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION)
-          # حذف V از ابتدا برای جستجو در CHANGELOG
-          if ! grep -q "## $VERSION" CHANGELOG.md; then
-            echo "⚠ هشدار: نسخه $VERSION در CHANGELOG.md پیدا نشد"
+          if ! grep -q "$VERSION" CHANGELOG.md; then
+            echo "Warning: $VERSION not found in CHANGELOG.md"
           else
-            echo "✓ نسخه $VERSION در CHANGELOG.md ثبت شده"
+            echo "CHANGELOG has $VERSION"
           fi
 
-  # ----------------------------------------------------------------- #
-  # Job 4: اسکن دوره‌ای (فقط در schedule)
-  # ----------------------------------------------------------------- #
-  scheduled-scan:
+  scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    name: "Scheduled Scan"
-    if: github.event_name == 'schedule'
+    timeout-minutes: 35
+    name: "Scan + Logs"
     needs: version-check
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
+      - name: Prepare folders
+        run: mkdir -p data reports
       - name: Run MemeHunter scan
         run: |
-          python main.py --format detailed --save --telegram --advanced
-
-      - name: Run backtest
+          set -o pipefail
+          LIMIT="${{ github.event.inputs.limit || '15' }}"
+          ADVANCED="${{ github.event.inputs.advanced || 'true' }}"
+          SEND_TG="${{ github.event.inputs.send_telegram || 'true' }}"
+          CMD="python main.py --limit $LIMIT --format detailed --save --verbose"
+          if [ "$ADVANCED" = "true" ]; then
+            CMD="$CMD --advanced --real-data"
+          fi
+          if [ "$SEND_TG" = "true" ]; then
+            CMD="$CMD --telegram"
+          fi
+          echo "Running: $CMD"
+          $CMD 2>&1 | tee reports/scan_console.log
+      - name: Run backtest (best effort)
+        continue-on-error: true
+        run: python main.py --backtest --save 2>&1 | tee reports/backtest_console.log || true
+      - name: Show log summary in Actions
+        if: always()
         run: |
-          python main.py --backtest --save || true
-
-      - name: Upload report as artifact
+          echo "===== FILES ====="
+          ls -la data/ || true
+          ls -la reports/ || true
+          echo "===== ACTIVITY LOG (tail) ====="
+          if [ -f data/activity.log ]; then tail -n 100 data/activity.log; else echo "no activity.log"; fi
+          echo "===== RUN_SUMMARY_JSON ====="
+          if [ -f data/activity.log ]; then grep "RUN_SUMMARY_JSON" data/activity.log || true; fi
+          echo "===== SCAN CONSOLE (tail) ====="
+          if [ -f reports/scan_console.log ]; then tail -n 50 reports/scan_console.log; fi
+      - name: Upload logs and reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: memehunter-report-${{ github.run_id }}
+          name: memehunter-run-${{ github.run_id }}
           path: |
-            reports/
             data/
+            reports/
+          if-no-files-found: warn
           retention-days: 90

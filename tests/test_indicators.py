@@ -231,3 +231,33 @@ class TestComputeIndicators(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestATRMismatch(unittest.TestCase):
+    """V1.3.2 - جلوگیری از IndexError وقتی طول highs/lows با closes فرق دارد."""
+
+    def test_atr_mismatched_lengths(self):
+        closes = [100 + i for i in range(40)]
+        highs = [c + 1 for c in closes[:20]]  # کوتاه‌تر
+        lows = [c - 1 for c in closes[:20]]
+        result = atr(highs, lows, closes, period=14)
+        # نباید Exception بدهد؛ یا None یا ATRResult معتبر
+        self.assertTrue(result is None or hasattr(result, "atr"))
+
+    def test_atr_equal_lengths(self):
+        closes = [100 + i * 0.5 for i in range(40)]
+        highs = [c + 2 for c in closes]
+        lows = [c - 2 for c in closes]
+        result = atr(highs, lows, closes, period=14)
+        self.assertIsNotNone(result)
+        self.assertGreater(result.atr, 0)
+
+    def test_compute_indicators_mismatch(self):
+        prices = [100 + i for i in range(40)]
+        volumes = [1000] * 40
+        highs = [p + 1 for p in prices[:15]]
+        lows = [p - 1 for p in prices[:15]]
+        pack = compute_indicators(prices, volumes, highs=highs, lows=lows)
+        self.assertIsNotNone(pack)
+        # نباید کرش کند
+

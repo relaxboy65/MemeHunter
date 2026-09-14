@@ -208,13 +208,27 @@ def atr(highs: List[float], lows: List[float], closes: List[float],
     محاسبه Average True Range با روش ویلدر.
     نیاز به داده OHLC دارد.
     ATR بالا = نوسان زیاد (ریسک بالا)
+
+    V1.3.2: همسان‌سازی طول highs/lows/closes برای جلوگیری از IndexError
+    وقتی market_chart و OHLC طول متفاوت دارند.
     """
-    if len(closes) < period + 1 or len(highs) != len(lows) != len(closes):
+    if not highs or not lows or not closes:
         return None
+
+    # همسان‌سازی طول — باگ قبلی: len(a) != len(b) != len(c) در پایتون
+    # فقط (a!=b) and (b!=c) است و وقتی highs==lows ولی کوتاه‌تر از closes
+    # چک عبور می‌کرد و IndexError می‌داد.
+    n = min(len(highs), len(lows), len(closes))
+    if n < period + 1:
+        return None
+
+    highs = highs[-n:]
+    lows = lows[-n:]
+    closes = closes[-n:]
 
     # محاسبه True Range برای هر روز
     tr_values: List[float] = []
-    for i in range(1, len(closes)):
+    for i in range(1, n):
         tr = max(
             highs[i] - lows[i],
             abs(highs[i] - closes[i - 1]),
@@ -334,14 +348,35 @@ def compute_indicators(prices: List[float],
     """
     محاسبه تمام اندیکاتورها در یک فراخوانی.
     اگر highs/lows داده شود، ATR هم محاسبه می‌شود.
+
+    V1.3.2: همسان‌سازی طول سری‌های قیمت/حجم قبل از محاسبه.
     """
     from .config import settings
+
+    # همسان‌سازی طول ورودی‌ها
+    if not prices:
+        return IndicatorPack()
+
+    n = len(prices)
+    if volumes:
+        n = min(n, len(volumes))
+        volumes = volumes[-n:]
+    prices = prices[-n:]
+
+    if highs is not None and lows is not None and highs and lows:
+        n2 = min(n, len(highs), len(lows))
+        highs = highs[-n2:]
+        lows = lows[-n2:]
+        # برای ATR از همان n2 استفاده می‌شود؛ prices جدا برش نمی‌خورد مگر لازم
+    else:
+        highs = None
+        lows = None
 
     pack = IndicatorPack(
         rsi=rsi(prices, period=14),
         macd=macd(prices),
         ma=ma_trend(prices),
-        volume_surge_ratio=volume_surge(volumes),
+        volume_surge_ratio=volume_surge(volumes) if volumes else None,
         price_momentum_pct=price_momentum(prices, window=7),
     )
 
