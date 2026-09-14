@@ -44,11 +44,18 @@ reports/
 # Environment
 .env
 
-# Note: data/ folder is tracked selectively
-# activity.log files are git-ignored but coins_database.csv is tracked
-# cache/ is also ignored
+# ============================================================
+# data/ — قانون پروژه: هیچ دیتابیس/لاگ واقعی به گیت‌هاب پوش نشود
+# فقط data/.gitkeep در ریپو باقی می‌ماند
+# ============================================================
 data/activity.log
 data/activity.log.*
 data/cache/
-
+data/coins_database.csv
 data/telegram_messages.csv
+data/*.csv
+data/*.json
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+!data/.gitkeep

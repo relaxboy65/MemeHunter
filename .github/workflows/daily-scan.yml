@@ -1,6 +1,6 @@
 name: MemeHunter CI
 
-# نسخه: V1.4.1
+# نسخه: V1.4.2
 on:
   push:
     branches: [main, master]
@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   lint:
@@ -115,6 +116,46 @@ jobs:
           pip install -r requirements.txt
       - name: Prepare folders
         run: mkdir -p data reports
+
+      # بازیابی داده ۹۰ روزه از آخرین آرتیفکت موفق (برای انباشت CSV و بک‌تست)
+      - name: Restore previous data artifact
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: daily-scan.yml
+          name: memehunter-persistent-data
+          path: data-restore
+          search_artifacts: true
+          if_no_artifact_found: warn
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge restored data into data/
+        run: |
+          mkdir -p data
+          if [ -d data-restore ]; then
+            echo "Restoring previous data files..."
+            # کپی فایل‌های موجود بدون overwrite اجباری برای لاگ تازه
+            for f in data-restore/*; do
+              [ -f "$f" ] || continue
+              base=$(basename "$f")
+              if [ "$base" = "coins_database.csv" ] || [ "$base" = "telegram_messages.csv" ]; then
+                cp -f "$f" "data/$base"
+                echo "  restored $base ($(wc -l < data/$base) lines)"
+              elif [ "$base" = "activity.log" ]; then
+                # لاگ قبلی را نگه می‌داریم تا cleanup ۹۰ روزه کار کند
+                cp -f "$f" "data/$base"
+                echo "  restored activity.log"
+              else
+                cp -n "$f" "data/" 2>/dev/null || true
+              fi
+            done
+            ls -la data/ || true
+          else
+            echo "No previous data artifact found — starting fresh (expected on first run)."
+          fi
+          # اطمینان از وجود .gitkeep
+          touch data/.gitkeep
+
       - name: Run MemeHunter scan
         run: |
           set -o pipefail
@@ -130,9 +171,11 @@ jobs:
           fi
           echo "Running: $CMD"
           $CMD 2>&1 | tee reports/scan_console.log
+
       - name: Run backtest (best effort)
         continue-on-error: true
         run: python main.py --backtest --save 2>&1 | tee reports/backtest_console.log || true
+
       - name: Show log summary in Actions
         if: always()
         run: |
@@ -140,12 +183,25 @@ jobs:
           ls -la data/ || true
           ls -la reports/ || true
           echo "===== ACTIVITY LOG (tail) ====="
-          if [ -f data/activity.log ]; then tail -n 100 data/activity.log; else echo "no activity.log"; fi
+          if [ -f data/activity.log ]; then tail -n 80 data/activity.log; else echo "no activity.log"; fi
           echo "===== RUN_SUMMARY_JSON ====="
           if [ -f data/activity.log ]; then grep "RUN_SUMMARY_JSON" data/activity.log || true; fi
+          echo "===== DB STATS ====="
+          if [ -f data/coins_database.csv ]; then
+            echo "coins_database.csv lines: $(wc -l < data/coins_database.csv)"
+            head -3 data/coins_database.csv
+          else
+            echo "no coins_database.csv"
+          fi
+          echo "===== TELEGRAM IDS ====="
+          if [ -f data/telegram_messages.csv ]; then
+            tail -5 data/telegram_messages.csv
+          fi
           echo "===== SCAN CONSOLE (tail) ====="
-          if [ -f reports/scan_console.log ]; then tail -n 50 reports/scan_console.log; fi
-      - name: Upload logs and reports
+          if [ -f reports/scan_console.log ]; then tail -n 40 reports/scan_console.log; fi
+
+      # آرتیفکت مخصوص این run (برای بررسی دستی)
+      - name: Upload run logs and reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -155,3 +211,14 @@ jobs:
             reports/
           if-no-files-found: warn
           retention-days: 90
+
+      # آرتیفکت ثابت‌نام برای بازیابی در اجرای بعدی (انباشت ۹۰ روزه)
+      - name: Upload persistent data for next runs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: memehunter-persistent-data
+          path: data/
+          if-no-files-found: warn
+          retention-days: 90
+          overwrite: true

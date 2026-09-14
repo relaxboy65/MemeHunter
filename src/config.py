@@ -161,7 +161,7 @@ class Settings:
     # === چند بازه زمانی (Multi-timeframe) ===
     ENABLE_MULTI_TIMEFRAME: bool = True
     TIMEFRAMES: tuple = ("1d", "4h")  # روزانه + 4 ساعته
-    MTF_SLEEP: float = 0.05  # V1.4.1 - فاصله بین تایم‌فریم‌ها
+    MTF_SLEEP: float = 0.05  # V1.4.2 - فاصله بین تایم‌فریم‌ها
     # آستانه confluence: حداقل چند بازه باید هم‌جهت باشند
     MTF_CONFLUENCE_MIN: int = 2
 
@@ -194,9 +194,9 @@ class Settings:
         "bonk", "wif", "bome", "myro", "slerf"
     )
 
-    REQUEST_DELAY: float = 0.6          # V1.4.1 - کاهش تأخیر بین درخواست‌ها
-    REQUEST_TIMEOUT: int = 12           # V1.4.1 - timeout کوتاه‌تر
-    MAX_RETRIES: int = 3                # V1.4.1 - کمتر retry کلی
+    REQUEST_DELAY: float = 0.6          # V1.4.2 - کاهش تأخیر بین درخواست‌ها
+    REQUEST_TIMEOUT: int = 12           # V1.4.2 - timeout کوتاه‌تر
+    MAX_RETRIES: int = 3                # V1.4.2 - کمتر retry کلی
     # مخصوص تاریخچه CoinGecko: fail-fast تا اسکن گیر نکند
     CG_HISTORY_MAX_RETRIES: int = 2
     CG_429_BASE_WAIT: float = 1.5       # به‌جای 5→25 ثانیه
@@ -207,7 +207,7 @@ class Settings:
     # === محدودیت نرخ پیشرفته (Token Bucket) ===
     ENABLE_RATE_LIMITER: bool = True
     RATE_LIMIT_CAPACITY: int = 12
-    RATE_LIMIT_REFILL_RATE: float = 1.0  # V1.4.1 - پر شدن سریع‌تر
+    RATE_LIMIT_REFILL_RATE: float = 1.0  # V1.4.2 - پر شدن سریع‌تر
 
     # === کش (cache) ===
     ENABLE_CACHE: bool = True

@@ -1,6 +1,6 @@
 # 🐸 MemeHunter - ربات پیداکننده میم‌کوین
 
-**نسخه فعلی**: V1.4.1
+**نسخه فعلی**: V1.4.2
 
 رباتی که با پایتون اجرا می‌شود، میم‌کوین‌های داغ بازار را از API رایگان **CoinGecko** پیدا می‌کند، چندین اندیکاتور تکنیکال را روی آن‌ها اعمال می‌کند و سیگنال **خرید / فروش / نگه‌داری** صادر می‌کند. داده‌ها در دیتابیس CSV ذخیره و نتایج می‌توانند به کانال تلگرام ارسال شوند.
 
@@ -9,7 +9,7 @@
 ---
 
 
-### 📡 منابع داده (V1.4.1)
+### 📡 منابع داده (V1.4.2)
 | نیاز | اولویت |
 |------|--------|
 | کشف میم‌کوین | CoinGecko categories |
@@ -34,7 +34,7 @@
 - **ATR** (Average True Range) - نوسان بازار
 - **Bollinger Bands** - تشخیص اشباع و squeeze
 
-### 🚀 تحلیل‌های پیشرفته (V1.4.1)
+### 🚀 تحلیل‌های پیشرفته (V1.4.2)
 - **لیکوییدیتی (Liquidity)**: تحلیل نقدشوندگی و تخمین اسپرد
 - **سوییپ (Sweep)**: تشخیص سوییپ لیکوییدیتی (شکست سقف/کف و بازگشت)
 - **اردرفلو (Order Flow)**: فشار خرید/فروش، دلتای تجمعی، جذب سفارش
@@ -67,17 +67,17 @@
 - **هشدار حجم غیرعادی** با z-score آماری
 - **محدودیت نرخ پیشرفته** (Token Bucket)
 - **پشتیبانی از چند بازه زمانی** (روزانه، 4 ساعته، ساعتی)
-- **لایه داده واقعی Binance** (V1.4.1): aggTrades برای CVD واقعی + depth برای اسپرد واقعی
-- **Paper Trading** (V1.4.1): ثبت سیگنال و ارزیابی نتیجه بدون ریسک واقعی
+- **لایه داده واقعی Binance** (V1.4.2): aggTrades برای CVD واقعی + depth برای اسپرد واقعی
+- **Paper Trading** (V1.4.2): ثبت سیگنال و ارزیابی نتیجه بدون ریسک واقعی
 - 96 تست واحد (همه موفق)
 
 ### 🔖 مدیریت نسخه
-- نسخه‌بندی معنایی V1.4.1
+- نسخه‌بندی معنایی V1.4.2
 - ساخت خودکار فایل زیپ با هر انتشار
 - نگهداری حداکثر 3 نسخه اخیر
 - CHANGELOG کامل با تاریخچه همه نسخه‌ها
 
-### ⚠️ شفافیت محدودیت‌ها (V1.4.1)
+### ⚠️ شفافیت محدودیت‌ها (V1.4.2)
 
 این پروژه با شفافیت کامل درباره منابع داده عمل می‌کند:
 
@@ -102,7 +102,7 @@
 
 1. **نام پروژه**: MemeHunter
 2. **فولدر `data/`**: شامل لاگ فعالیت و دیتابیس CSV با نگهداری 90 روز
-3. **نسخه‌بندی**: V1.4.1 (Major.Minor.Patch)
+3. **نسخه‌بندی**: V1.4.2 (Major.Minor.Patch)
 4. **ساخت زیپ**: با هر تغییر نسخه، فایل زیپ در `releases/` ساخته می‌شود
 5. **نگهداری نسخه**: حداکثر 3 نسخه اخیر در `releases/` نگهداری می‌شود
 
@@ -167,16 +167,16 @@ python main.py --limit 5 --telegram-preview
 # خروجی JSON برای اتصال به ابزار دیگر
 python main.py --format json --save
 
-# داشبورد HTML (V1.4.1)
+# داشبورد HTML (V1.4.2)
 python main.py --format html --save
 
-# اسکن با تحلیل‌های پیشرفته (V1.4.1)
+# اسکن با تحلیل‌های پیشرفته (V1.4.2)
 python main.py --advanced --limit 10 --format detailed
 
-# بک‌تست سیگنال‌های گذشته (V1.4.1)
+# بک‌تست سیگنال‌های گذشته (V1.4.2)
 python main.py --backtest
 
-# فقط هشدار حجم غیرعادی (V1.4.1)
+# فقط هشدار حجم غیرعادی (V1.4.2)
 python main.py --volume-alert --limit 50
 ```
 
@@ -187,7 +187,7 @@ python main.py --volume-alert --limit 50
 ```
 MemeHunter/
 ├── main.py                       # نقطه ورود CLI
-├── VERSION                       # نسخه فعلی (V1.4.1)
+├── VERSION                       # نسخه فعلی (V1.4.2)
 ├── CHANGELOG.md                  # تاریخچه تغییرات نسخه‌ها
 ├── RELEASE_RULES.md              # قوانین پروژه
 ├── requirements.txt
@@ -204,17 +204,17 @@ MemeHunter/
 │   └── cache/                    # کش API (TTL 1 ساعت)
 ├── reports/                      # خروجی گزارش‌ها
 ├── releases/                     # فایل‌های زیپ (حداکثر 3 نسخه)
-│   └── MemeHunter-V1.4.1.zip
+│   └── MemeHunter-V1.4.2.zip
 ├── scripts/
 │   └── release.py                # اسکریپت مدیریت نسخه
 ├── tests/                         # 70 تست واحد
 │   ├── test_indicators.py
 │   ├── test_analyzer.py
 │   ├── test_coin_service.py
-│   ├── test_advanced_analysis.py  # V1.4.1
-│   ├── test_rate_limiter.py       # V1.4.1
-│   ├── test_backtest.py           # V1.4.1
-│   └── test_volume_alert.py       # V1.4.1
+│   ├── test_advanced_analysis.py  # V1.4.2
+│   ├── test_rate_limiter.py       # V1.4.2
+│   ├── test_backtest.py           # V1.4.2
+│   └── test_volume_alert.py       # V1.4.2
 └── src/
     ├── __init__.py
     ├── config.py                 # تنظیمات (نسخه پویا، وزن‌ها، ...)
@@ -222,14 +222,14 @@ MemeHunter/
     ├── logging_setup.py          # لاگ‌نویسی چرخشی 90 روزه
     ├── storage.py                # دیتابیس CSV
     ├── coin_service.py           # اتصال به CoinGecko + کش
-    ├── rate_limiter.py           # V1.4.1 - Token Bucket
+    ├── rate_limiter.py           # V1.4.2 - Token Bucket
     ├── indicators.py             # RSI، MACD، MA، ATR، Bollinger
-    ├── advanced_analysis.py      # V1.4.1 - لیکوییدیتی/سوییپ/اردرفلو/والیوم پروفایل
+    ├── advanced_analysis.py      # V1.4.2 - لیکوییدیتی/سوییپ/اردرفلو/والیوم پروفایل
     ├── analyzer.py               # ترکیب و صدور سیگنال (7 فاکتور)
-    ├── backtest.py                # V1.4.1 - بک‌تست سیگنال‌ها
-    ├── volume_alert.py            # V1.4.1 - هشدار حجم غیرعادی
+    ├── backtest.py                # V1.4.2 - بک‌تست سیگنال‌ها
+    ├── volume_alert.py            # V1.4.2 - هشدار حجم غیرعادی
     ├── reporter.py               # قالب‌بندی خروجی متنی
-    ├── html_reporter.py          # V1.4.1 - داشبورد HTML
+    ├── html_reporter.py          # V1.4.2 - داشبورد HTML
     └── notifier.py               # نوتیفیکیشن تلگرام با ایموجی
 ```
 
@@ -241,13 +241,13 @@ MemeHunter/
 
 ```bash
 # رفع خطا
-python scripts/release.py patch          # V1.4.1 → V1.4.1
+python scripts/release.py patch          # V1.4.2 → V1.4.2
 
 # ویژگی جدید
-python scripts/release.py minor          # V1.4.1 → V1.4.1
+python scripts/release.py minor          # V1.4.2 → V1.4.2
 
 # تغییر بزرگ
-python scripts/release.py major          # V1.4.1 → V1.4.1
+python scripts/release.py major          # V1.4.2 → V1.4.2
 
 # مشاهده نسخه فعلی
 python scripts/release.py current

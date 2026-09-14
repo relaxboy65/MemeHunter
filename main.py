@@ -707,7 +707,7 @@ def main() -> int:
     else:
         print(f"\n✓ داشبورد HTML تولید شد.")
 
-    # پیش‌نمایش / ارسال تلگرام — V1.4.1
+    # پیش‌نمایش / ارسال تلگرام — V1.4.2
     paper_stats = None
     if settings.ENABLE_PAPER_TRADING:
         paper_stats = get_paper_trading_stats()
@@ -742,8 +742,8 @@ def main() -> int:
             results, paper_trading_stats=paper_stats, run_meta=run_meta
         )
         if ok:
-            print(f"\n✓ پیام تلگرام ارسال شد (message_id={msg_ids}).")
-            print("  برای ریپلای بعدی روی همین پیام، id در data/telegram_messages.csv ذخیره شد.")
+            print(f"\n✓ پیام تلگرام ارسال شد (message_id(ها)={msg_ids}).")
+            print("  برای ریپلای بعدی روی این پیام‌ها، idها در data/telegram_messages.csv ذخیره شدند.")
         else:
             notifier = TelegramNotifier()
             if not notifier.is_configured:

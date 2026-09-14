@@ -1,11 +1,11 @@
 """
 notifier.py
-ارسال نوتیفیکیشن تلگرام - MemeHunter V1.4.1
+ارسال نوتیفیکیشن تلگرام - MemeHunter V1.4.2
 
 - خلاصه واضح BUY / SELL / HOLD
-- تفکیک نتایج + هشتگ
-- لینک CoinGecko / TradingView / KuCoin
-- بازگرداندن message_id برای ریپلای بعدی
+- تفکیک پیام‌ها (خلاصه + بخش‌ها) برای خوانایی و امکان ریپلای
+- ذخیره تمام message_idها برای ریپلای بعدی روی چک نتیجه
+- بدون هشدار ریسک و بدون هشتگ پروژه در متن پیام
 """
 from __future__ import annotations
 
@@ -30,17 +30,12 @@ SIGNAL_BADGE = {
     Signal.HOLD: "🟡 HOLD",
 }
 
-DISCLAIMER = (
-    "⚠️ هشدار ریسک:\n"
-    "سیگنال‌ها صرفاً آموزشی‌اند و توصیه مالی نیستند.\n"
-    "میم‌کوین‌ها پرنوسان‌اند — فقط با پول قابل‌از‌دست‌دادن وارد شوید. DYOR."
-)
-
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TG_MSG_FILE = DATA_DIR / "telegram_messages.csv"
 TG_MSG_COLUMNS = [
     "sent_at", "message_id", "chat_id", "scan_timestamp",
     "buy_count", "sell_count", "hold_count", "total", "version",
+    "message_ids",  # لیست کامل idها با کاما (برای ریپلای روی هر بخش)
 ]
 
 
@@ -69,7 +64,6 @@ def _cg_link(coin_id: str) -> str:
 
 
 def _tv_link(symbol: str) -> str:
-    # TradingView pair فرضی USDT
     return f"https://www.tradingview.com/symbols/{symbol.upper()}USDT/"
 
 
@@ -77,32 +71,61 @@ def _kucoin_link(symbol: str) -> str:
     return f"https://www.kucoin.com/trade/{symbol.upper()}-USDT"
 
 
-def _hashtags(symbol: str, signal: Signal) -> str:
-    sig = signal.value if hasattr(signal, "value") else str(signal)
-    # فارسی سیگنال → انگلیسی هشتگ
-    map_sig = {"خرید": "BUY", "فروش": "SELL", "نگه‌داری": "HOLD"}
-    sig_en = map_sig.get(sig, sig.upper().replace(" ", ""))
+def _coin_tag(symbol: str) -> str:
+    """فقط هشتگ نماد کوین (بدون هشتگ پروژه)."""
     clean = "".join(c for c in symbol.upper() if c.isalnum())
-    return f"#{clean} #{sig_en} #MemeHunter #Crypto"
+    return f"#{clean}" if clean else ""
 
 
-def format_telegram_message(
+def _build_coin_block(r: AnalysisResult, show_reasons: int = 2) -> List[str]:
+    lines: List[str] = []
+    badge = SIGNAL_BADGE.get(r.signal, "🟡 HOLD")
+    lines.append(f"{badge}  {r.name} ({r.symbol})")
+    lines.append(
+        f"  💵 {_price_str(r.current_price)}  |  "
+        f"24h: {r.change_24h_pct:+.1f}%  |  7d: {r.change_7d_pct:+.1f}%"
+    )
+    lines.append(
+        f"  🎚 امتیاز: {r.score:.3f}  |  اطمینان: {r.confidence * 100:.0f}%"
+    )
+    mcap = _format_money(r.market_cap)
+    vol = _format_money(r.volume_24h)
+    lines.append(f"  💰 مارکت‌کپ: {mcap}  |  حجم: {vol}")
+    if r.data_sources:
+        lines.append(f"  📡 {r.data_sources}")
+    if r.reasons:
+        for reason in r.reasons[:show_reasons]:
+            short = reason if len(reason) < 90 else reason[:87] + "…"
+            lines.append(f"  • {short}")
+    links = [
+        f"CG: {_cg_link(r.coin_id)}",
+        f"TV: {_tv_link(r.symbol)}",
+    ]
+    if r.data_sources and ("KuCoin" in r.data_sources or "واقعی" in r.data_sources):
+        links.append(f"KC: {_kucoin_link(r.symbol)}")
+    lines.append("  🔗 " + " | ".join(links))
+    tag = _coin_tag(r.symbol)
+    if tag:
+        lines.append(f"  {tag}")
+    lines.append("")
+    return lines
+
+
+def format_telegram_parts(
     results: List[AnalysisResult],
     paper_trading_stats: Optional[dict] = None,
     run_meta: Optional[dict] = None,
-) -> str:
+) -> List[str]:
     """
-    پیام فاخر و خوانا — V1.4.1
-
-    ساختار:
-    1) هدر + نتیجه کلی (چند خرید/فروش/نگهداری)
-    2) بخش 🟢 BUY / 🔴 SELL / 🟡 HOLD (تا ۵ مورد هر کدام)
-    3) لینک + هشتگ هر کوین
-    4) آمار منابع داده
-    5) سلب مسئولیت
+    ساخت چند بخش جدا برای ارسال به صورت پیام‌های مجزا.
+    ترتیب:
+      1) خلاصه اجرا
+      2) سیگنال‌های خرید (در صورت وجود)
+      3) سیگنال‌های فروش (در صورت وجود)
+      4) نگه‌داری‌های برتر
     """
     if not results:
-        return "❌ هیچ میم‌کوینی در این اسکن تحلیل نشد."
+        return ["❌ هیچ میم‌کوینی در این اسکن تحلیل نشد."]
 
     sorted_results = sorted(results, key=lambda r: r.score, reverse=True)
     buys = [r for r in sorted_results if r.signal == Signal.BUY]
@@ -111,99 +134,90 @@ def format_telegram_message(
 
     real_count = sum(1 for r in results if r.data_sources and "واقعی" in (r.data_sources or ""))
     proxy_only = len(results) - real_count
-
-    lines: List[str] = []
     ver = settings.PROJECT_VERSION
-    lines.append(f"🎯 MemeHunter {ver} — گزارش اسکن")
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    lines.append("")
-    lines.append("📋 نتیجه این اجرا:")
-    lines.append(
+
+    # —— ۱) خلاصه
+    summary: List[str] = []
+    summary.append(f"🎯 MemeHunter {ver} — گزارش اسکن")
+    summary.append("━━━━━━━━━━━━━━━━━━━━")
+    summary.append("")
+    summary.append("📋 نتیجه این اجرا:")
+    summary.append(
         f"  🟢 خرید: {len(buys)}   🔴 فروش: {len(sells)}   🟡 نگه‌داری: {len(holds)}"
     )
-    lines.append(f"  📊 کل تحلیل‌شده: {len(results)}")
-    lines.append(f"  ✅ داده واقعی: {real_count}  |  🔮 فقط پروکسی: {proxy_only}")
+    summary.append(f"  📊 کل تحلیل‌شده: {len(results)}")
+    summary.append(f"  ✅ داده واقعی: {real_count}  |  🔮 فقط پروکسی: {proxy_only}")
     if run_meta:
         if run_meta.get("history_kucoin") is not None:
-            lines.append(
+            summary.append(
                 f"  📡 تاریخچه: KuCoin={run_meta.get('history_kucoin', 0)} "
                 f"| CG={run_meta.get('history_coingecko', 0)}"
             )
         if run_meta.get("duration_seconds"):
-            lines.append(f"  ⏱ مدت اسکن: {run_meta['duration_seconds']:.0f}s")
-    lines.append("")
-
-    def _section(title: str, items: List[AnalysisResult], limit: int = 5) -> None:
-        if not items:
-            return
-        lines.append(title)
-        lines.append("───────────────")
-        for r in items[:limit]:
-            badge = SIGNAL_BADGE.get(r.signal, "🟡 HOLD")
-            lines.append(f"{badge}  {r.name} ({r.symbol})")
-            lines.append(
-                f"  💵 {_price_str(r.current_price)}  |  "
-                f"24h: {r.change_24h_pct:+.1f}%  |  7d: {r.change_7d_pct:+.1f}%"
-            )
-            lines.append(
-                f"  🎚 امتیاز: {r.score:.3f}  |  اطمینان: {r.confidence * 100:.0f}%"
-            )
-            mcap = _format_money(r.market_cap)
-            vol = _format_money(r.volume_24h)
-            lines.append(f"  💰 مارکت‌کپ: {mcap}  |  حجم: {vol}")
-            if r.data_sources:
-                lines.append(f"  📡 {r.data_sources}")
-            # دلایل کوتاه
-            if r.reasons:
-                for reason in r.reasons[:2]:
-                    short = reason if len(reason) < 90 else reason[:87] + "…"
-                    lines.append(f"  • {short}")
-            # لینک‌ها
-            links = [
-                f"CG: {_cg_link(r.coin_id)}",
-                f"TV: {_tv_link(r.symbol)}",
-            ]
-            if r.data_sources and ("KuCoin" in r.data_sources or "واقعی" in r.data_sources):
-                links.append(f"KC: {_kucoin_link(r.symbol)}")
-            lines.append("  🔗 " + " | ".join(links))
-            lines.append(f"  {_hashtags(r.symbol, r.signal)}")
-            lines.append("")
-        if len(items) > limit:
-            lines.append(f"  … و {len(items) - limit} مورد دیگر")
-            lines.append("")
-
-    if buys:
-        _section(f"🟢 سیگنال‌های خرید ({len(buys)})", buys, limit=8)
-    if sells:
-        _section(f"🔴 سیگنال‌های فروش ({len(sells)})", sells, limit=8)
-    # HOLD: فقط برترین‌ها اگر BUY/SELL نبود یا همیشه ۳ تای برتر
-    if holds:
-        title = f"🟡 نگه‌داری — برترین امتیازها ({len(holds)} کل)"
-        _section(title, holds, limit=5 if (buys or sells) else 8)
-
+            summary.append(f"  ⏱ مدت اسکن: {run_meta['duration_seconds']:.0f}s")
+    summary.append("")
     if not buys and not sells:
-        lines.append("ℹ️ در این اسکن سیگنال خرید/فروش صادر نشد.")
-        lines.append("همه در محدوده نگه‌داری بودند.")
-        lines.append("")
-
+        summary.append("ℹ️ در این اسکن سیگنال خرید/فروش صادر نشد.")
+        summary.append("همه در محدوده نگه‌داری بودند.")
+        summary.append("")
     if paper_trading_stats and paper_trading_stats.get("total_positions", 0) > 0:
-        lines.append("───────────────")
-        lines.append("📈 Paper Trading:")
-        lines.append(f"  باز: {paper_trading_stats.get('open_positions', 0)}  |  "
-                     f"بسته: {paper_trading_stats.get('closed_positions', 0)}")
+        summary.append("📈 Paper Trading:")
+        summary.append(
+            f"  باز: {paper_trading_stats.get('open_positions', 0)}  |  "
+            f"بسته: {paper_trading_stats.get('closed_positions', 0)}"
+        )
         if paper_trading_stats.get("closed_positions", 0) > 0:
-            lines.append(
+            summary.append(
                 f"  WinRate: {paper_trading_stats.get('win_rate', 0):.0f}%  |  "
                 f"PnL: ${paper_trading_stats.get('total_pnl_usd', 0):+.2f}"
             )
-        lines.append("")
+        summary.append("")
+    summary.append(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M')} | {ver}")
+    parts: List[str] = ["\n".join(summary)]
 
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    lines.append(DISCLAIMER)
-    lines.append(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M')} | {ver}")
-    lines.append("#MemeHunter #ScanReport")
+    # —— ۲) خرید
+    if buys:
+        lines = [f"🟢 سیگنال‌های خرید ({len(buys)})", "───────────────", ""]
+        for r in buys[:10]:
+            lines.extend(_build_coin_block(r))
+        if len(buys) > 10:
+            lines.append(f"… و {len(buys) - 10} مورد دیگر")
+        parts.append("\n".join(lines))
 
-    return "\n".join(lines)
+    # —— ۳) فروش
+    if sells:
+        lines = [f"🔴 سیگنال‌های فروش ({len(sells)})", "───────────────", ""]
+        for r in sells[:10]:
+            lines.extend(_build_coin_block(r))
+        if len(sells) > 10:
+            lines.append(f"… و {len(sells) - 10} مورد دیگر")
+        parts.append("\n".join(lines))
+
+    # —— ۴) نگه‌داری (برترین‌ها)
+    if holds:
+        limit = 5 if (buys or sells) else 8
+        lines = [
+            f"🟡 نگه‌داری — برترین امتیازها ({len(holds)} کل)",
+            "───────────────",
+            "",
+        ]
+        for r in holds[:limit]:
+            lines.extend(_build_coin_block(r, show_reasons=1))
+        if len(holds) > limit:
+            lines.append(f"… و {len(holds) - limit} مورد دیگر")
+        parts.append("\n".join(lines))
+
+    return parts
+
+
+def format_telegram_message(
+    results: List[AnalysisResult],
+    paper_trading_stats: Optional[dict] = None,
+    run_meta: Optional[dict] = None,
+) -> str:
+    """نسخه تک‌پیام (برای پیش‌نمایش). از parts استفاده می‌کند."""
+    parts = format_telegram_parts(results, paper_trading_stats, run_meta)
+    return "\n\n".join(parts)
 
 
 def save_telegram_message_id(
@@ -213,10 +227,12 @@ def save_telegram_message_id(
     sell_count: int,
     hold_count: int,
     total: int,
+    all_message_ids: Optional[List[int]] = None,
 ) -> None:
-    """ذخیره message_id برای ریپلای بعدی در چک نتایج."""
+    """ذخیره message_id (و لیست کامل) برای ریپلای بعدی در چک نتایج."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     write_header = not TG_MSG_FILE.exists()
+    ids_str = ",".join(str(i) for i in (all_message_ids or [message_id]))
     with TG_MSG_FILE.open("a", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         if write_header:
@@ -231,8 +247,12 @@ def save_telegram_message_id(
             hold_count,
             total,
             settings.PROJECT_VERSION,
+            ids_str,
         ])
-    logger.info("Telegram message_id=%s ذخیره شد → %s", message_id, TG_MSG_FILE)
+    logger.info(
+        "Telegram message_id=%s (all=%s) ذخیره شد → %s",
+        message_id, ids_str, TG_MSG_FILE,
+    )
 
 
 def get_last_telegram_message_id() -> Optional[int]:
@@ -247,6 +267,22 @@ def get_last_telegram_message_id() -> Optional[int]:
         return int(rows[-1]["message_id"])
     except (ValueError, KeyError, OSError):
         return None
+
+
+def get_last_telegram_message_ids() -> List[int]:
+    """لیست کامل آخرین message_idها."""
+    if not TG_MSG_FILE.exists():
+        return []
+    try:
+        with TG_MSG_FILE.open("r", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        if not rows:
+            return []
+        last = rows[-1]
+        raw = last.get("message_ids") or str(last.get("message_id", ""))
+        return [int(x) for x in raw.split(",") if x.strip().isdigit()]
+    except (ValueError, KeyError, OSError):
+        return []
 
 
 class TelegramNotifier:
@@ -272,9 +308,7 @@ class TelegramNotifier:
         parse_mode: Optional[str] = None,
         reply_to_message_id: Optional[int] = None,
     ) -> Tuple[bool, List[int]]:
-        """
-        ارسال پیام. برمی‌گرداند (موفقیت, لیست message_idها).
-        """
+        """ارسال یک متن (در صورت طولانی بودن به چند تکه تقسیم می‌شود)."""
         if not self.is_configured:
             logger.warning(
                 "Telegram notifier is not configured "
@@ -296,6 +330,39 @@ class TelegramNotifier:
                 all_ok = False
             else:
                 ids.append(mid)
+        self.last_message_ids = ids
+        return all_ok, ids
+
+    def send_parts(
+        self,
+        parts: List[str],
+        reply_to_message_id: Optional[int] = None,
+    ) -> Tuple[bool, List[int]]:
+        """
+        ارسال چند بخش به صورت پیام‌های مجزا.
+        پیام اول می‌تواند reply به پیام قبلی باشد؛ بقیه مستقل‌اند.
+        """
+        if not self.is_configured:
+            logger.warning(
+                "Telegram notifier is not configured "
+                "(TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing)."
+            )
+            return False, []
+
+        ids: List[int] = []
+        all_ok = True
+        for i, part in enumerate(parts):
+            if not part or not part.strip():
+                continue
+            # هر بخش ممکن است خودش طولانی باشد
+            chunks = self._split_message(part, max_length=4000)
+            for j, chunk in enumerate(chunks):
+                reply = reply_to_message_id if (i == 0 and j == 0) else None
+                mid = self._send_single(chunk, reply_to_message_id=reply)
+                if mid is None:
+                    all_ok = False
+                else:
+                    ids.append(mid)
         self.last_message_ids = ids
         return all_ok, ids
 
@@ -361,17 +428,25 @@ def notify_results(
     results: List[AnalysisResult],
     paper_trading_stats: Optional[dict] = None,
     run_meta: Optional[dict] = None,
+    reply_to_previous: bool = False,
 ) -> Tuple[bool, List[int]]:
-    """ساخت پیام، ارسال، ذخیره message_id."""
+    """
+    ساخت بخش‌های جدا، ارسال، ذخیره تمام message_idها.
+    اگر reply_to_previous=True باشد، به آخرین message_id قبلی ریپلای می‌کند.
+    """
     notifier = TelegramNotifier()
     if not notifier.is_configured:
         return False, []
-    message = format_telegram_message(
+
+    parts = format_telegram_parts(
         results,
         paper_trading_stats=paper_trading_stats,
         run_meta=run_meta,
     )
-    ok, ids = notifier.send_message(message)
+
+    reply_id = get_last_telegram_message_id() if reply_to_previous else None
+    ok, ids = notifier.send_parts(parts, reply_to_message_id=reply_id)
+
     if ok and ids:
         buy_c = sum(1 for r in results if r.signal == Signal.BUY)
         sell_c = sum(1 for r in results if r.signal == Signal.SELL)
@@ -383,5 +458,6 @@ def notify_results(
             sell_c,
             hold_c,
             len(results),
+            all_message_ids=ids,
         )
     return ok, ids

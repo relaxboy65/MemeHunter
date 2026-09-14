@@ -25,6 +25,8 @@ from .notifier import (
     notify_results,
     save_telegram_message_id,
     get_last_telegram_message_id,
+    get_last_telegram_message_ids,
+    format_telegram_parts,
 )
 from .version import Version, read_version, write_version, bump_and_save, current_version_string
 from .logging_setup import (
@@ -100,6 +102,8 @@ __all__ = [
     # notifier
     "TelegramNotifier",
     "format_telegram_message",
+    "format_telegram_parts",
+    "get_last_telegram_message_ids",
     "notify_results",
     # version
     "Version",
