@@ -1,4 +1,4 @@
-name: MemeHunter CI V1.4.5
+name: MemeHunter CI V1.4.6
 
 # نسخه ورک‌فلو باید با فایل VERSION هماهنگ باشد
 on:
@@ -31,7 +31,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    name: "Lint (pycodestyle) — V1.4.5"
+    name: "Lint (pycodestyle) — V1.4.6"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,7 +49,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    name: "Tests — V1.4.5"
+    name: "Tests — V1.4.6"
     needs: lint
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
   version-check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    name: "Version Check — V1.4.5"
+    name: "Version Check — V1.4.6"
     needs: test
     steps:
       - uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    name: "Scan — V1.4.5"
+    name: "Scan — V1.4.6"
     needs: version-check
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     env:
@@ -131,10 +131,7 @@ jobs:
           mkdir -p data reports
           # اگر CSV هنوز فقط هدر دارد یا نیست، هدر را تضمین کن
           if [ ! -f data/coins_database.csv ]; then
-            echo "scan_date,scan_timestamp,coin_id,symbol,name,current_price_usd,market_cap_usd,volume_24h_usd,change_24h_pct,change_7d_pct,rsi,macd_hist,ma_short,ma_long,ma_bullish,volume_surge_ratio,price_momentum_pct,score,signal,confidence,atr,atr_percent,bollinger_percent_b,bollinger_squeeze,liquidity_score,liquidity_is_real,liquidity_spread,liquidity_imbalance,sweep_detected,sweep_type,orderflow_buy_pressure,orderflow_sell_pressure,orderflow_is_real,large_swap_count,large_buys,large_sells,mtf_confluence_score,mtf_aligned_count,data_sources" > data/coins_database.csv
-          fi
-          if [ ! -f data/telegram_messages.csv ]; then
-            echo "sent_at,message_id,chat_id,scan_timestamp,coin_id,symbol,name,signal,score,version" > data/telegram_messages.csv
+            echo "scan_date,scan_timestamp,coin_id,symbol,name,current_price_usd,market_cap_usd,volume_24h_usd,change_24h_pct,change_7d_pct,rsi,macd_hist,ma_short,ma_long,ma_bullish,volume_surge_ratio,price_momentum_pct,score,signal,confidence,atr,atr_percent,bollinger_percent_b,bollinger_squeeze,liquidity_score,liquidity_is_real,liquidity_spread,liquidity_imbalance,sweep_detected,sweep_type,orderflow_buy_pressure,orderflow_sell_pressure,orderflow_is_real,large_swap_count,large_buys,large_sells,mtf_confluence_score,mtf_aligned_count,data_sources,telegram_message_id" > data/coins_database.csv
           fi
           echo "=== data/ before scan ==="
           ls -la data/
@@ -171,10 +168,9 @@ jobs:
           fi
           echo "coins_database.csv lines: $(wc -l < data/coins_database.csv)"
           head -3 data/coins_database.csv
-          if [ -f data/telegram_messages.csv ]; then
-            echo "telegram_messages.csv lines: $(wc -l < data/telegram_messages.csv)"
-            tail -5 data/telegram_messages.csv
-          fi
+          echo "--- telegram_message_id sample ---"
+          head -3 data/coins_database.csv
+          python3 -c "import csv; r=list(csv.DictReader(open('data/coins_database.csv'))); print('rows',len(r)); print('last ids',[(x.get('symbol'),x.get('telegram_message_id')) for x in r[-5:]])" 2>/dev/null || true
           if [ -f data/activity.log ]; then
             echo "activity.log size: $(wc -c < data/activity.log) bytes"
             tail -n 30 data/activity.log
@@ -189,11 +185,11 @@ jobs:
           git config user.name "MemeHunter-Bot"
           git config user.email "memehunter-bot@users.noreply.github.com"
           # فقط فایل‌های دیتابیس CSV — لاگ activity به گیت نمی‌رود
-          git add data/coins_database.csv data/telegram_messages.csv data/.gitkeep || true
+          git add data/coins_database.csv data/.gitkeep || true
           if git diff --cached --quiet; then
             echo "No database changes to commit"
           else
-            VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION || echo V1.4.5)
+            VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION || echo V1.4.6)
             git commit -m "data: update databases after scan ($VERSION) [skip ci]"
             git push origin HEAD:${{ github.ref_name }}
             echo "Pushed data/ CSV databases to repository"
@@ -204,7 +200,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: memehunter-V1.4.5-log-${{ github.run_id }}
+          name: memehunter-V1.4.6-log-${{ github.run_id }}
           path: |
             data/activity.log
             reports/scan_console.log

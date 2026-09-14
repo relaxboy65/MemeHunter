@@ -1,4 +1,3 @@
-# data/ — دیتابیس پروژه داخل ریپو
-# coins_database.csv : ارزها با تاریخ (نگهداری ۹۰ روز)
-# telegram_messages.csv : message_id پیام‌های تلگرام (۹۰ روز)
-# activity.log : فقط محلی / CI — به گیت پوش نمی‌شود
+# data/
+# coins_database.csv — دیتابیس ارزها + ستون telegram_message_id (۹۰ روز)
+# activity.log — لاگ محلی (به گیت پوش نمی‌شود)

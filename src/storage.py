@@ -69,15 +69,38 @@ DB_COLUMNS = [
     "mtf_confluence_score",
     "mtf_aligned_count",
     "data_sources",              # خلاصه منابع داده (مثل "2 واقعی + 2 پروکسی")
+    "telegram_message_id",       # message_id پیام تلگرام این ارز (برای ریپلای نتیجه)
 ]
 
 
 def ensure_db_file() -> None:
-    """اگر فایل دیتابیس وجود نداشت، آن را با هدر ایجاد می‌کند."""
+    """اگر فایل دیتابیس وجود نداشت، آن را با هدر ایجاد می‌کند.
+    اگر هدر قدیمی باشد (ستون telegram_message_id نباشد)، ستون را اضافه می‌کند.
+    """
     if not DB_FILE.exists():
         with DB_FILE.open("w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(DB_COLUMNS)
+        return
+    # مهاجرت هدر در صورت نیاز
+    with DB_FILE.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.reader(f)
+        try:
+            header = next(reader)
+        except StopIteration:
+            header = []
+        rows = list(reader)
+    if header != DB_COLUMNS:
+        # بازنویسی با هدر کامل؛ ستون‌های جدید خالی می‌مانند
+        with DB_FILE.open("w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=DB_COLUMNS, extrasaction="ignore")
+            writer.writeheader()
+            for row in rows:
+                d = {}
+                for i, col in enumerate(header):
+                    if i < len(row):
+                        d[col] = row[i]
+                writer.writerow(d)
 
 
 def save_results_to_db(results: List[AnalysisResult]) -> int:
@@ -138,6 +161,7 @@ def save_results_to_db(results: List[AnalysisResult]) -> int:
             adv.get("mtf_confluence_score"),
             adv.get("mtf_aligned_count"),
             getattr(r, "data_sources", "") or "",
+            getattr(r, "telegram_message_id", None) or "",
         ])
 
     if not rows:

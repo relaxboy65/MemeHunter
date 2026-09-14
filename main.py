@@ -65,7 +65,6 @@ from src import (
     TelegramNotifier,
     format_telegram_message,
     notify_results,
-    cleanup_old_telegram_records,
     setup_logging,
     get_log_path,
     cleanup_old_logs,
@@ -653,8 +652,54 @@ def main() -> int:
             if r.signal == Signal.BUY and r.confidence > settings.ADVANCED_MIN_CONFIDENCE:
                 open_position(r.symbol, r.name, r.current_price, r.score)
 
-    # ذخیره در دیتابیس CSV (data/coins_database.csv) — با تاریخ و نگهداری ۹۰ روز
-    from pathlib import Path as _Path
+    # --- تلگرام اول (تا message_id روی results ست شود) سپس ذخیره در DB ---
+    paper_stats = None
+    if settings.ENABLE_PAPER_TRADING:
+        paper_stats = get_paper_trading_stats()
+    run_meta = {
+        "duration_seconds": time.time() - start_time,
+        "history_kucoin": sum(
+            1 for r in results if r.data_sources and "واقعی" in (r.data_sources or "")
+        ),
+        "history_coingecko": sum(
+            1 for r in results if r.data_sources and "واقعی" not in (r.data_sources or "")
+        ),
+    }
+
+    if args.telegram_preview:
+        telegram_message = format_telegram_message(
+            results, paper_trading_stats=paper_stats, run_meta=run_meta
+        )
+        print()
+        print("=" * 70)
+        print(f"  {settings.PROJECT_NAME} - پیش‌نمایش پیام تلگرام")
+        print("=" * 70)
+        print()
+        print(telegram_message)
+        print()
+        print("=" * 70)
+        print(f"طول پیام: {len(telegram_message)} کاراکتر")
+        print("=" * 70)
+
+    if args.telegram:
+        from src.notifier import notify_results as _notify
+        ok, msg_ids = _notify(
+            results, paper_trading_stats=paper_stats, run_meta=run_meta
+        )
+        if ok:
+            print(f"\n✓ پیام‌های تلگرام ارسال شد — تعداد: {len(msg_ids)} (هر ارز یک پیام جدا)")
+            print(f"  message_idها: {msg_ids}")
+            print("  هر message_id در ستون telegram_message_id فایل coins_database.csv ذخیره می‌شود.")
+        else:
+            notifier = TelegramNotifier()
+            if not notifier.is_configured:
+                print("\n✗ تلگرام پیکربندی نشده. تنظیم کنید:")
+                print("  export TELEGRAM_BOT_TOKEN='...'")
+                print("  export TELEGRAM_CHAT_ID='...'")
+            else:
+                print("\n✗ ارسال تلگرام ناموفق بود.")
+
+    # ذخیره در دیتابیس CSV (data/coins_database.csv) — شامل telegram_message_id
     saved_count = save_results_to_db(results)
     db_path = get_db_path().resolve()
     logger.info("%d رکورد در دیتابیس CSV ذخیره شد → %s", saved_count, db_path)
@@ -666,9 +711,6 @@ def main() -> int:
 
     # پاکسازی رکوردهای قدیمی‌تر از 90 روز
     deleted = cleanup_old_db_records()
-    deleted_tg = cleanup_old_telegram_records()
-    if deleted_tg:
-        logger.info("%d رکورد قدیمی تلگرام حذف شد", deleted_tg)
     if deleted > 0:
         logger.info("%d رکورد قدیمی حذف شد", deleted)
     deleted_logs = cleanup_old_logs()
@@ -723,53 +765,6 @@ def main() -> int:
     else:
         print(f"\n✓ داشبورد HTML تولید شد.")
 
-    # پیش‌نمایش / ارسال تلگرام — V1.4.2
-    paper_stats = None
-    if settings.ENABLE_PAPER_TRADING:
-        paper_stats = get_paper_trading_stats()
-    run_meta = {
-        "duration_seconds": time.time() - start_time,
-        "history_kucoin": sum(
-            1 for r in results if r.data_sources and "واقعی" in (r.data_sources or "")
-        ),
-        "history_coingecko": sum(
-            1 for r in results if r.data_sources and "واقعی" not in (r.data_sources or "")
-        ),
-    }
-    telegram_message = format_telegram_message(
-        results, paper_trading_stats=paper_stats, run_meta=run_meta
-    )
-    if args.telegram_preview:
-        print()
-        print("=" * 70)
-        print(f"  {settings.PROJECT_NAME} - پیش‌نمایش پیام تلگرام")
-        print("=" * 70)
-        print()
-        print(telegram_message)
-        print()
-        print("=" * 70)
-        print(f"طول پیام: {len(telegram_message)} کاراکتر")
-        print("=" * 70)
-
-    # ارسال به تلگرام + ذخیره message_id
-    if args.telegram:
-        from src.notifier import notify_results as _notify
-        ok, msg_ids = _notify(
-            results, paper_trading_stats=paper_stats, run_meta=run_meta
-        )
-        if ok:
-            print(f"\n✓ پیام‌های تلگرام ارسال شد — تعداد: {len(msg_ids)} (هر ارز یک پیام جدا)")
-            print(f"  message_idها: {msg_ids}")
-            print("  مشخصات هر پیام در data/telegram_messages.csv ذخیره شد (برای ریپلای چک نتیجه).")
-        else:
-            notifier = TelegramNotifier()
-            if not notifier.is_configured:
-                print("\n✗ تلگرام پیکربندی نشده. تنظیم کنید:")
-                print("  export TELEGRAM_BOT_TOKEN='...'")
-                print("  export TELEGRAM_CHAT_ID='...'")
-            else:
-                print("\n✗ ارسال تلگرام ناموفق بود.")
-
     print("\n⚠  هشدار ریسک: میم‌کوین‌ها بسیار نوسانی هستند. این سیگنال‌ها توصیه مالی نیستند.")
 
     # اطلاعات نگهداری داده
@@ -777,8 +772,7 @@ def main() -> int:
     print("-" * 70)
     print(f"  فایل لاگ فعالیت:    {get_log_path().resolve()}")
     print(f"  فایل دیتابیس CSV:  {get_db_path().resolve()}")
-    tg_csv = get_db_path().parent / "telegram_messages.csv"
-    print(f"  جدول پیام تلگرام:  {tg_csv.resolve()} ({'موجود' if tg_csv.exists() else 'هنوز خالی'})")
+    print("  ستون telegram_message_id در coins_database.csv برای ریپلای نتیجه استفاده می‌شود")
     stats = get_db_stats()
     print(f"  آمار دیتابیس:       {stats['total_records']} رکورد | "
           f"{stats['unique_coins']} کوین منحصر | "

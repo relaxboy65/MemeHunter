@@ -20,37 +20,29 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
 venv/
 env/
 ENV/
 .venv/
 .env
 
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
 .DS_Store
 Thumbs.db
 
-# Reports (خروجی موقت)
 reports/
 
-# Environment / secrets
 .env
 
-# ============================================================
-# data/ — دیتابیس CSV داخل ریپو نگهداری می‌شود (۹۰ روز)
-# فقط لاگ خام و کش ignore می‌شوند
-# ============================================================
+# data/: دیتابیس CSV در ریپو می‌ماند؛ لاگ ignore
 data/activity.log
 data/activity.log.*
 data/cache/
 data/.last_save
+data/telegram_messages.csv
 !data/.gitkeep
 !data/coins_database.csv
-!data/telegram_messages.csv

@@ -1,15 +1,15 @@
 """
 notifier.py
-ارسال نوتیفیکیشن تلگرام - MemeHunter V1.4.3
+ارسال نوتیفیکیشن تلگرام - MemeHunter V1.4.6
 
-قوانین این نسخه:
 - برای هر ارز یک پیام جداگانه ارسال می‌شود
-- message_id هر پیام در data/telegram_messages.csv ذخیره می‌شود
+- message_id روی AnalysisResult.telegram_message_id ست می‌شود
+  و در data/coins_database.csv ذخیره می‌گردد (ستون telegram_message_id)
+- فایل telegram_messages.csv حذف شده است
 - بدون هشدار ریسک و بدون هشتگ پروژه
 """
 from __future__ import annotations
 
-import csv
 import logging
 import os
 import time
@@ -30,24 +30,6 @@ SIGNAL_BADGE = {
     Signal.SELL: "🔴 SELL",
     Signal.HOLD: "🟡 HOLD",
 }
-
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-TG_MSG_FILE = DATA_DIR / "telegram_messages.csv"
-TG_RETENTION_DAYS = 90
-
-# جدول CSV مشخصات پیام تلگرام (یک ردیف به ازای هر ارز)
-TG_MSG_COLUMNS = [
-    "sent_at",          # تاریخ و ساعت ارسال
-    "message_id",       # آی‌دی پیام تلگرام
-    "chat_id",
-    "scan_timestamp",   # epoch اسکن
-    "coin_id",
-    "symbol",
-    "name",
-    "signal",
-    "score",
-    "version",
-]
 
 
 def _format_money(amount: float) -> str:
@@ -114,7 +96,9 @@ def format_coin_message(r: AnalysisResult, run_meta: Optional[dict] = None) -> s
         f"CG: {_cg_link(r.coin_id)}",
         f"TV: {_tv_link(r.symbol)}",
     ]
-    if r.data_sources and ("KuCoin" in (r.data_sources or "") or "واقعی" in (r.data_sources or "")):
+    if r.data_sources and (
+        "KuCoin" in (r.data_sources or "") or "واقعی" in (r.data_sources or "")
+    ):
         links.append(f"KC: {_kucoin_link(r.symbol)}")
     lines.append("🔗 " + " | ".join(links))
     tag = _coin_tag(r.symbol)
@@ -128,11 +112,13 @@ def format_summary_message(
     results: List[AnalysisResult],
     run_meta: Optional[dict] = None,
 ) -> str:
-    """پیام خلاصه کوتاه (اختیاری، قبل از پیام‌های تک‌ارز)."""
+    """پیام خلاصه کوتاه قبل از پیام‌های تک‌ارز."""
     buys = sum(1 for r in results if r.signal == Signal.BUY)
     sells = sum(1 for r in results if r.signal == Signal.SELL)
     holds = sum(1 for r in results if r.signal == Signal.HOLD)
-    real_count = sum(1 for r in results if r.data_sources and "واقعی" in (r.data_sources or ""))
+    real_count = sum(
+        1 for r in results if r.data_sources and "واقعی" in (r.data_sources or "")
+    )
     lines = [
         f"🎯 MemeHunter {settings.PROJECT_VERSION} — خلاصه اسکن",
         "━━━━━━━━━━━━━━━━━━━━",
@@ -150,7 +136,7 @@ def format_telegram_message(
     paper_trading_stats: Optional[dict] = None,
     run_meta: Optional[dict] = None,
 ) -> str:
-    """پیش‌نمایش: خلاصه + پیام هر ارز (برای --telegram-preview)."""
+    """پیش‌نمایش: خلاصه + پیام هر ارز."""
     if not results:
         return "❌ هیچ میم‌کوینی در این اسکن تحلیل نشد."
     parts = [format_summary_message(results, run_meta)]
@@ -164,7 +150,6 @@ def format_telegram_parts(
     paper_trading_stats: Optional[dict] = None,
     run_meta: Optional[dict] = None,
 ) -> List[str]:
-    """سازگاری با کد قبلی: لیست متن پیام‌ها."""
     if not results:
         return ["❌ هیچ میم‌کوینی در این اسکن تحلیل نشد."]
     parts = [format_summary_message(results, run_meta)]
@@ -173,101 +158,20 @@ def format_telegram_parts(
     return parts
 
 
-def ensure_tg_csv() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if not TG_MSG_FILE.exists():
-        with TG_MSG_FILE.open("w", encoding="utf-8", newline="") as f:
-            csv.writer(f).writerow(TG_MSG_COLUMNS)
-
-
-def save_coin_message_id(
-    message_id: int,
-    chat_id: str,
-    coin: AnalysisResult,
-) -> None:
-    """ذخیره مشخصات پیام یک ارز در جدول CSV."""
-    ensure_tg_csv()
-    with TG_MSG_FILE.open("a", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            message_id,
-            chat_id,
-            int(datetime.now().timestamp()),
-            coin.coin_id,
-            coin.symbol,
-            coin.name,
-            coin.signal.value if hasattr(coin.signal, "value") else str(coin.signal),
-            round(coin.score, 4),
-            settings.PROJECT_VERSION,
-        ])
-    logger.info(
-        "Telegram message_id=%s برای %s ذخیره شد → %s",
-        message_id, coin.symbol, TG_MSG_FILE,
-    )
-
-
-def cleanup_old_telegram_records() -> int:
-    """حذف رکوردهای قدیمی‌تر از ۹۰ روز از telegram_messages.csv."""
-    if not TG_MSG_FILE.exists():
-        return 0
-    cutoff = time.time() - (TG_RETENTION_DAYS * 86400)
-    with TG_MSG_FILE.open("r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        fieldnames = reader.fieldnames or TG_MSG_COLUMNS
-        kept: List[Dict[str, Any]] = []
-        deleted = 0
-        for row in reader:
-            try:
-                ts = int(row.get("scan_timestamp", 0) or 0)
-                if ts >= cutoff:
-                    kept.append(row)
-                else:
-                    deleted += 1
-            except (ValueError, TypeError):
-                kept.append(row)
-    if deleted > 0:
-        with TG_MSG_FILE.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(kept)
-    return deleted
-
-
-def get_last_telegram_message_id() -> Optional[int]:
-    if not TG_MSG_FILE.exists():
-        return None
-    try:
-        with TG_MSG_FILE.open("r", encoding="utf-8") as f:
-            rows = list(csv.DictReader(f))
-        if not rows:
-            return None
-        return int(rows[-1]["message_id"])
-    except (ValueError, KeyError, OSError):
-        return None
-
-
-def get_last_telegram_message_ids() -> List[int]:
-    if not TG_MSG_FILE.exists():
-        return []
-    try:
-        with TG_MSG_FILE.open("r", encoding="utf-8") as f:
-            rows = list(csv.DictReader(f))
-        return [int(r["message_id"]) for r in rows if r.get("message_id")]
-    except (ValueError, KeyError, OSError):
-        return []
-
-
 def get_message_id_for_symbol(symbol: str) -> Optional[int]:
-    """آخرین message_id ذخیره‌شده برای یک نماد (برای ریپلای چک نتیجه)."""
-    if not TG_MSG_FILE.exists():
+    """آخرین telegram_message_id ذخیره‌شده برای یک نماد از coins_database.csv."""
+    from .storage import DB_FILE
+    if not DB_FILE.exists():
         return None
     try:
-        with TG_MSG_FILE.open("r", encoding="utf-8") as f:
+        import csv
+        with DB_FILE.open("r", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         for row in reversed(rows):
             if (row.get("symbol") or "").upper() == symbol.upper():
-                return int(row["message_id"])
+                mid = row.get("telegram_message_id") or ""
+                if str(mid).strip().isdigit():
+                    return int(mid)
     except (ValueError, KeyError, OSError):
         return None
     return None
@@ -300,7 +204,9 @@ class TelegramNotifier:
                 "(TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing)."
             )
             return False, []
-        mid = self._send_single(text, parse_mode=parse_mode, reply_to_message_id=reply_to_message_id)
+        mid = self._send_single(
+            text, parse_mode=parse_mode, reply_to_message_id=reply_to_message_id
+        )
         if mid is None:
             return False, []
         self.last_message_ids = [mid]
@@ -325,11 +231,15 @@ class TelegramNotifier:
         try:
             resp = requests.post(url, json=payload, timeout=15)
             if resp.status_code != 200:
-                logger.error("Telegram API error %d: %s", resp.status_code, resp.text[:300])
+                logger.error(
+                    "Telegram API error %d: %s", resp.status_code, resp.text[:300]
+                )
                 return None
             data = resp.json()
             mid = data.get("result", {}).get("message_id")
-            logger.info("Telegram message sent to %s (message_id=%s)", self.chat_id, mid)
+            logger.info(
+                "Telegram message sent to %s (message_id=%s)", self.chat_id, mid
+            )
             return int(mid) if mid is not None else None
         except (requests.exceptions.RequestException, ValueError, TypeError) as exc:
             logger.error("Failed to send Telegram message: %s", exc)
@@ -345,7 +255,7 @@ def notify_results(
     """
     ۱) یک پیام خلاصه
     ۲) یک پیام جدا برای هر ارز
-    ۳) ذخیره message_id هر ارز در data/telegram_messages.csv
+    ۳) ست کردن result.telegram_message_id برای ذخیره در coins_database.csv
     """
     notifier = TelegramNotifier()
     if not notifier.is_configured:
@@ -358,14 +268,12 @@ def notify_results(
     all_ids: List[int] = []
     any_ok = False
 
-    # خلاصه
     summary = format_summary_message(results, run_meta)
     ok, ids = notifier.send_message(summary)
     if ok and ids:
         any_ok = True
         all_ids.extend(ids)
 
-    # یک پیام به ازای هر ارز + ذخیره در CSV
     sorted_results = sorted(results, key=lambda r: r.score, reverse=True)
     for r in sorted_results:
         text = format_coin_message(r, run_meta)
@@ -373,13 +281,13 @@ def notify_results(
         if ok and ids:
             any_ok = True
             all_ids.extend(ids)
-            save_coin_message_id(ids[0], notifier.chat_id, r)
-        # فاصله کوتاه برای جلوگیری از flood limit تلگرام
+            # ست روی خود نتیجه تا در coins_database.csv ذخیره شود
+            r.telegram_message_id = ids[0]
+            logger.info(
+                "telegram_message_id=%s برای %s ست شد (coins_database)",
+                ids[0], r.symbol,
+            )
         time.sleep(0.35)
-
-    deleted = cleanup_old_telegram_records()
-    if deleted:
-        logger.info("%d رکورد قدیمی تلگرام (بیش از ۹۰ روز) حذف شد", deleted)
 
     notifier.last_message_ids = all_ids
     return any_ok, all_ids

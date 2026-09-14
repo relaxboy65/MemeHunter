@@ -176,6 +176,7 @@ class AnalysisResult:
     # V1.3.0 - داده‌های پیشرفته
     advanced: dict = field(default_factory=dict)
     data_sources: str = ""             # خلاصه منابع داده
+    telegram_message_id: object = None  # message_id تلگرام برای ریپلای بعدی
 
     def to_dict(self) -> dict:
         return {
@@ -194,6 +195,7 @@ class AnalysisResult:
             "indicators": self.indicators,
             "advanced": self.advanced,
             "data_sources": self.data_sources,
+            "telegram_message_id": self.telegram_message_id,
         }
 
 

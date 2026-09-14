@@ -23,11 +23,7 @@ from .notifier import (
     TelegramNotifier,
     format_telegram_message,
     notify_results,
-    cleanup_old_telegram_records,
-    get_last_telegram_message_id,
-    get_last_telegram_message_ids,
-    save_coin_message_id,
-    get_message_id_for_symbol,
+                    get_message_id_for_symbol,
     format_coin_message,
     format_telegram_parts,
 )
@@ -106,10 +102,8 @@ __all__ = [
     "TelegramNotifier",
     "format_telegram_message",
     "format_telegram_parts",
-    "get_last_telegram_message_ids",
-    "notify_results",
-    "cleanup_old_telegram_records",
-    # version
+        "notify_results",
+        # version
     "Version",
     "read_version",
     "write_version",
