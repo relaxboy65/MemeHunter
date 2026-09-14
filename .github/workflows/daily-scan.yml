@@ -1,6 +1,6 @@
-name: MemeHunter CI
+name: MemeHunter CI V1.4.5
 
-# نسخه: V1.4.3
+# نسخه ورک‌فلو باید با فایل VERSION هماهنگ باشد
 on:
   push:
     branches: [main, master]
@@ -24,14 +24,14 @@ on:
         default: "true"
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    name: "Lint (pycodestyle)"
+    name: "Lint (pycodestyle) — V1.4.5"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,7 +49,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    name: "Tests (unittest + pytest)"
+    name: "Tests — V1.4.5"
     needs: lint
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
   version-check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    name: "Version Check"
+    name: "Version Check — V1.4.5"
     needs: test
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +86,12 @@ jobs:
             exit 1
           fi
           echo "Version OK: $VERSION"
+          # نام ورک‌فلو باید شامل همین نسخه باشد
+          if ! grep -q "$VERSION" .github/workflows/daily-scan.yml; then
+            echo "ERROR: workflow file does not contain version $VERSION"
+            exit 1
+          fi
+          echo "Workflow name/version consistent with VERSION file"
       - name: Check CHANGELOG entry
         run: |
           VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION)
@@ -98,7 +104,7 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    name: "Scan + Logs"
+    name: "Scan — V1.4.5"
     needs: version-check
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     env:
@@ -107,50 +113,32 @@ jobs:
       COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # برای commit بعدی به همین branch
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Prepare folders
-        run: mkdir -p data reports
-
-      - name: Restore previous data artifact
-        uses: dawidd6/action-download-artifact@v6
-        continue-on-error: true
-        with:
-          workflow: daily-scan.yml
-          name: memehunter-persistent-data
-          path: data-restore
-          search_artifacts: true
-          if_no_artifact_found: warn
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Merge restored data into data/
         run: |
-          mkdir -p data
-          if [ -d data-restore ]; then
-            echo "Restoring previous data files for 90-day retention..."
-            for f in data-restore/*; do
-              [ -f "$f" ] || continue
-              base=$(basename "$f")
-              case "$base" in
-                coins_database.csv|telegram_messages.csv|activity.log|activity.log.*)
-                  cp -f "$f" "data/$base"
-                  echo "  restored $base"
-                  ;;
-                *)
-                  cp -n "$f" "data/" 2>/dev/null || true
-                  ;;
-              esac
-            done
-            ls -la data/ || true
-          else
-            echo "No previous data artifact — first run starts empty data/."
+          mkdir -p data reports
+          # اگر CSV هنوز فقط هدر دارد یا نیست، هدر را تضمین کن
+          if [ ! -f data/coins_database.csv ]; then
+            echo "scan_date,scan_timestamp,coin_id,symbol,name,current_price_usd,market_cap_usd,volume_24h_usd,change_24h_pct,change_7d_pct,rsi,macd_hist,ma_short,ma_long,ma_bullish,volume_surge_ratio,price_momentum_pct,score,signal,confidence,atr,atr_percent,bollinger_percent_b,bollinger_squeeze,liquidity_score,liquidity_is_real,liquidity_spread,liquidity_imbalance,sweep_detected,sweep_type,orderflow_buy_pressure,orderflow_sell_pressure,orderflow_is_real,large_swap_count,large_buys,large_sells,mtf_confluence_score,mtf_aligned_count,data_sources" > data/coins_database.csv
           fi
-          touch data/.gitkeep
+          if [ ! -f data/telegram_messages.csv ]; then
+            echo "sent_at,message_id,chat_id,scan_timestamp,coin_id,symbol,name,signal,score,version" > data/telegram_messages.csv
+          fi
+          echo "=== data/ before scan ==="
+          ls -la data/
+          wc -l data/*.csv 2>/dev/null || true
 
       - name: Run MemeHunter scan
         run: |
@@ -172,46 +160,54 @@ jobs:
         continue-on-error: true
         run: python main.py --backtest --save 2>&1 | tee reports/backtest_console.log || true
 
-      - name: Show log summary in Actions
+      - name: Verify data/ databases on disk
         if: always()
         run: |
-          echo "===== DATA FILES ====="
-          ls -la data/ || true
-          echo "===== ACTIVITY LOG (tail) ====="
-          if [ -f data/activity.log ]; then tail -n 100 data/activity.log; else echo "no activity.log"; fi
-          echo "===== RUN_SUMMARY_JSON ====="
-          if [ -f data/activity.log ]; then grep "RUN_SUMMARY_JSON" data/activity.log || true; fi
-          echo "===== coins_database.csv ====="
-          if [ -f data/coins_database.csv ]; then
-            echo "lines: $(wc -l < data/coins_database.csv)"
-            head -2 data/coins_database.csv
+          echo "===== VERIFY data/ (must exist in repo folder) ====="
+          ls -la data/
+          if [ ! -f data/coins_database.csv ]; then
+            echo "ERROR: data/coins_database.csv missing"
+            exit 1
           fi
-          echo "===== telegram_messages.csv ====="
+          echo "coins_database.csv lines: $(wc -l < data/coins_database.csv)"
+          head -3 data/coins_database.csv
           if [ -f data/telegram_messages.csv ]; then
-            echo "lines: $(wc -l < data/telegram_messages.csv)"
-            tail -10 data/telegram_messages.csv
+            echo "telegram_messages.csv lines: $(wc -l < data/telegram_messages.csv)"
+            tail -5 data/telegram_messages.csv
+          fi
+          if [ -f data/activity.log ]; then
+            echo "activity.log size: $(wc -c < data/activity.log) bytes"
+            tail -n 30 data/activity.log
+          fi
+          grep "DATA_SAVE_OK\|RUN_SUMMARY_JSON" data/activity.log || true
+
+      # دیتابیس‌ها داخل فولدر data/ ریپو commit می‌شوند (نه Artifact)
+      - name: Commit data/ databases to repository
+        if: always()
+        run: |
+          set -e
+          git config user.name "MemeHunter-Bot"
+          git config user.email "memehunter-bot@users.noreply.github.com"
+          # فقط فایل‌های دیتابیس CSV — لاگ activity به گیت نمی‌رود
+          git add data/coins_database.csv data/telegram_messages.csv data/.gitkeep || true
+          if git diff --cached --quiet; then
+            echo "No database changes to commit"
+          else
+            VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION || echo V1.4.5)
+            git commit -m "data: update databases after scan ($VERSION) [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "Pushed data/ CSV databases to repository"
           fi
 
-      # Artifact قابل‌چک: فقط لاگ کامل کار
+      # Artifact فقط برای چک لاگ کامل کار (بدون دیتابیس)
       - name: Upload full work log only (Artifacts)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: memehunter-full-log-${{ github.run_id }}
+          name: memehunter-V1.4.5-log-${{ github.run_id }}
           path: |
             data/activity.log
             reports/scan_console.log
             reports/backtest_console.log
           if-no-files-found: warn
           retention-days: 90
-
-      # داده پایدار برای انباشت ۹۰ روزه (run بعدی)
-      - name: Upload persistent data for next runs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: memehunter-persistent-data
-          path: data/
-          if-no-files-found: warn
-          retention-days: 90
-          overwrite: true

@@ -82,17 +82,22 @@ def ensure_db_file() -> None:
 
 def save_results_to_db(results: List[AnalysisResult]) -> int:
     """
-    ذخیره نتایج اسکن در دیتابیس CSV.
+    ذخیره نتایج اسکن در دیتابیس CSV داخل data/coins_database.csv
+    با تاریخ (scan_date / scan_timestamp). نگهداری ۹۰ روز.
     برمی‌گرداند: تعداد رکوردهای ذخیره‌شده.
     """
+    import logging
+    log = logging.getLogger("memehunter")
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     ensure_db_file()
     now = datetime.now()
     timestamp = int(now.timestamp())
 
     rows: List[List[Any]] = []
     for r in results:
-        ind = r.indicators
-        adv = getattr(r, "advanced", {}) or {}
+        ind = r.indicators or {}
+        adv = getattr(r, "advanced", None) or {}
         rows.append([
             now.strftime("%Y-%m-%d %H:%M:%S"),
             timestamp,
@@ -112,14 +117,12 @@ def save_results_to_db(results: List[AnalysisResult]) -> int:
             ind.get("volume_surge_ratio"),
             ind.get("price_momentum_pct"),
             round(r.score, 4),
-            r.signal.value,
+            r.signal.value if hasattr(r.signal, "value") else str(r.signal),
             round(r.confidence, 4),
-            # V1.1.0 - اندیکاتورهای جدید
             ind.get("atr"),
             ind.get("atr_percent"),
             ind.get("bollinger_percent_b"),
             ind.get("bollinger_squeeze"),
-            # V1.3.0 - فیلدهای کلیدی پیشرفته
             adv.get("liquidity_score"),
             adv.get("liquidity_is_real"),
             adv.get("spread_estimate"),
@@ -134,13 +137,33 @@ def save_results_to_db(results: List[AnalysisResult]) -> int:
             adv.get("large_sells"),
             adv.get("mtf_confluence_score"),
             adv.get("mtf_aligned_count"),
-            getattr(r, "data_sources", ""),
+            getattr(r, "data_sources", "") or "",
         ])
 
+    if not rows:
+        log.warning("save_results_to_db: هیچ ردیفی برای ذخیره نبود")
+        return 0
+
+    abs_path = DB_FILE.resolve()
     with DB_FILE.open("a", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(rows)
+        f.flush()
 
+    # تأیید ذخیره واقعی روی دیسک
+    if not DB_FILE.exists():
+        raise OSError(f"فایل دیتابیس پس از نوشتن وجود ندارد: {abs_path}")
+    size = DB_FILE.stat().st_size
+    log.info(
+        "DATA_SAVE_OK: %d رکورد → %s (size=%d bytes)",
+        len(rows), abs_path, size,
+    )
+    # نشانگر آخرین ذخیره
+    marker = DATA_DIR / ".last_save"
+    marker.write_text(
+        f"{now.isoformat()}|coins_database.csv|{len(rows)}|{abs_path}\n",
+        encoding="utf-8",
+    )
     return len(rows)
 
 

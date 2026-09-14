@@ -653,9 +653,16 @@ def main() -> int:
             if r.signal == Signal.BUY and r.confidence > settings.ADVANCED_MIN_CONFIDENCE:
                 open_position(r.symbol, r.name, r.current_price, r.score)
 
-    # ذخیره در دیتابیس CSV
+    # ذخیره در دیتابیس CSV (data/coins_database.csv) — با تاریخ و نگهداری ۹۰ روز
+    from pathlib import Path as _Path
     saved_count = save_results_to_db(results)
-    logger.info("%d رکورد در دیتابیس CSV ذخیره شد", saved_count)
+    db_path = get_db_path().resolve()
+    logger.info("%d رکورد در دیتابیس CSV ذخیره شد → %s", saved_count, db_path)
+    if not db_path.exists():
+        logger.error("خطا: فایل دیتابیس پس از ذخیره وجود ندارد: %s", db_path)
+        print(f"✗ خطا: دیتابیس ذخیره نشد: {db_path}")
+    else:
+        print(f"✓ دیتابیس ارزها ذخیره شد: {db_path} ({saved_count} رکورد, {db_path.stat().st_size} بایت)")
 
     # پاکسازی رکوردهای قدیمی‌تر از 90 روز
     deleted = cleanup_old_db_records()
@@ -667,6 +674,11 @@ def main() -> int:
     deleted_logs = cleanup_old_logs()
     if deleted_logs > 0:
         logger.info("%d فایل لاگ قدیمی حذف شد", deleted_logs)
+
+    # فهرست فایل‌های موجود در data/ برای شفافیت
+    data_dir = db_path.parent
+    data_files = sorted(data_dir.glob("*"))
+    logger.info("DATA_DIR contents (%s): %s", data_dir, [f.name for f in data_files if f.is_file()])
 
     # فرمت‌بندی خروجی
     backtest_text = None
@@ -763,13 +775,19 @@ def main() -> int:
     # اطلاعات نگهداری داده
     print()
     print("-" * 70)
-    print(f"  فایل لاگ فعالیت:    {get_log_path()}")
-    print(f"  فایل دیتابیس CSV:  {get_db_path()}")
+    print(f"  فایل لاگ فعالیت:    {get_log_path().resolve()}")
+    print(f"  فایل دیتابیس CSV:  {get_db_path().resolve()}")
+    tg_csv = get_db_path().parent / "telegram_messages.csv"
+    print(f"  جدول پیام تلگرام:  {tg_csv.resolve()} ({'موجود' if tg_csv.exists() else 'هنوز خالی'})")
     stats = get_db_stats()
     print(f"  آمار دیتابیس:       {stats['total_records']} رکورد | "
           f"{stats['unique_coins']} کوین منحصر | "
           f"آخرین اسکن: {stats['last_scan'] or '-'}")
-    print(f"  سیاست نگهداری:     لاگ و دیتابیس 90 روز نگهداری می‌شوند")
+    print(f"  سیاست نگهداری:     لاگ و دیتابیس و پیام‌ها 90 روز نگهداری می‌شوند")
+    # لیست واقعی فایل‌های data/
+    ddir = get_db_path().parent
+    existing = [f"{f.name}({f.stat().st_size}B)" for f in sorted(ddir.iterdir()) if f.is_file()]
+    print(f"  محتویات data/:     {', '.join(existing) if existing else '(خالی)'}")
 
     # V1.3.0 - خلاصه منابع داده
     real_count = sum(1 for r in results if "واقعی" in (r.data_sources or ""))

@@ -37,25 +37,20 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Reports
+# Reports (خروجی موقت)
 reports/
-*.log
 
-# Environment
+# Environment / secrets
 .env
 
 # ============================================================
-# data/ — هیچ دیتابیس/لاگ واقعی به گیت‌هاب پوش نمی‌شود
-# فقط data/.gitkeep در ریپو می‌ماند
+# data/ — دیتابیس CSV داخل ریپو نگهداری می‌شود (۹۰ روز)
+# فقط لاگ خام و کش ignore می‌شوند
 # ============================================================
 data/activity.log
 data/activity.log.*
 data/cache/
-data/coins_database.csv
-data/telegram_messages.csv
-data/*.csv
-data/*.json
-data/*.db
-data/*.sqlite
-data/*.sqlite3
+data/.last_save
 !data/.gitkeep
+!data/coins_database.csv
+!data/telegram_messages.csv
