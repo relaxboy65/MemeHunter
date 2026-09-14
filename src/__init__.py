@@ -19,7 +19,13 @@ from .advanced_analysis import (
 from .analyzer import analyze_coin, AnalysisResult, Signal
 from .reporter import format_table, format_detailed, format_json, format_csv, save_report
 from .html_reporter import format_html, save_html_report
-from .notifier import TelegramNotifier, format_telegram_message, notify_results
+from .notifier import (
+    TelegramNotifier,
+    format_telegram_message,
+    notify_results,
+    save_telegram_message_id,
+    get_last_telegram_message_id,
+)
 from .version import Version, read_version, write_version, bump_and_save, current_version_string
 from .logging_setup import (
     setup_logging, get_log_path, cleanup_old_logs,

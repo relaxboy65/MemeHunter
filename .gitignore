@@ -51,3 +51,4 @@ data/activity.log
 data/activity.log.*
 data/cache/
 
+data/telegram_messages.csv

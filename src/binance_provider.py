@@ -432,5 +432,5 @@ class BinanceClient:
             klines = self.get_klines(coin_symbol, interval=tf, limit=100)
             if klines:
                 result[tf] = klines
-            time.sleep(0.5)  # احترام به rate limit
+            time.sleep(getattr(settings, "MTF_SLEEP", 0.05))
         return result

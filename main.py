@@ -393,7 +393,7 @@ def run_scan(limit: int = 50, advanced: bool = False,
             record_error("scan", str(exc), symbol)
             logger.error("  خطا در تحلیل %s: %s", symbol, exc)
         # V1.4.0 - تأخیر کمتر چون KuCoin محدودیت نرم‌تری دارد
-        delay = 0.4 if history_source == "kucoin" else settings.REQUEST_DELAY
+        delay = settings.INTER_COIN_DELAY_FAST if history_source == "kucoin" else settings.INTER_COIN_DELAY_SLOW
         time.sleep(delay)
 
     end_phase("analyze_coins", {
@@ -610,7 +610,7 @@ def main() -> int:
         if args.telegram:
             notifier = TelegramNotifier()
             if notifier.is_configured:
-                notifier.send_message(output)
+                notifier.send_message(output)  # returns (ok, ids)
         return 0
 
     # حالت backtest
@@ -707,11 +707,22 @@ def main() -> int:
     else:
         print(f"\n✓ داشبورد HTML تولید شد.")
 
-    # پیش‌نمایش پیام تلگرام
+    # پیش‌نمایش / ارسال تلگرام — V1.4.1
     paper_stats = None
     if settings.ENABLE_PAPER_TRADING:
         paper_stats = get_paper_trading_stats()
-    telegram_message = format_telegram_message(results, paper_trading_stats=paper_stats)
+    run_meta = {
+        "duration_seconds": time.time() - start_time,
+        "history_kucoin": sum(
+            1 for r in results if r.data_sources and "واقعی" in (r.data_sources or "")
+        ),
+        "history_coingecko": sum(
+            1 for r in results if r.data_sources and "واقعی" not in (r.data_sources or "")
+        ),
+    }
+    telegram_message = format_telegram_message(
+        results, paper_trading_stats=paper_stats, run_meta=run_meta
+    )
     if args.telegram_preview:
         print()
         print("=" * 70)
@@ -724,17 +735,21 @@ def main() -> int:
         print(f"طول پیام: {len(telegram_message)} کاراکتر")
         print("=" * 70)
 
-    # ارسال به تلگرام
+    # ارسال به تلگرام + ذخیره message_id
     if args.telegram:
-        notifier = TelegramNotifier()
-        if not notifier.is_configured:
-            print("\n✗ تلگرام پیکربندی نشده. تنظیم کنید:")
-            print("  export TELEGRAM_BOT_TOKEN='123456:ABC-DEF...'")
-            print("  export TELEGRAM_CHAT_ID='@your_channel'")
+        from src.notifier import notify_results as _notify
+        ok, msg_ids = _notify(
+            results, paper_trading_stats=paper_stats, run_meta=run_meta
+        )
+        if ok:
+            print(f"\n✓ پیام تلگرام ارسال شد (message_id={msg_ids}).")
+            print("  برای ریپلای بعدی روی همین پیام، id در data/telegram_messages.csv ذخیره شد.")
         else:
-            ok = notifier.send_message(telegram_message)
-            if ok:
-                print(f"\n✓ پیام تلگرام به {notifier.chat_id} ارسال شد.")
+            notifier = TelegramNotifier()
+            if not notifier.is_configured:
+                print("\n✗ تلگرام پیکربندی نشده. تنظیم کنید:")
+                print("  export TELEGRAM_BOT_TOKEN='...'")
+                print("  export TELEGRAM_CHAT_ID='...'")
             else:
                 print("\n✗ ارسال تلگرام ناموفق بود.")
 

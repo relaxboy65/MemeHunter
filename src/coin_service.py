@@ -110,32 +110,56 @@ class CoinGeckoClient:
                 logger.debug("Cache HIT for %s", path)
                 return cached
 
+        # V1.4.1 - برای تاریخچه (market_chart/ohlc) fail-fast تا اسکن معطل نشود
+        is_history = "market_chart" in path or "ohlc" in path
+        max_retries = (
+            settings.CG_HISTORY_MAX_RETRIES if is_history else settings.MAX_RETRIES
+        )
         last_error: Optional[Exception] = None
-        for attempt in range(1, settings.MAX_RETRIES + 1):
+        for attempt in range(1, max_retries + 1):
             try:
-                # دریافت token از rate limiter پیش از ارسال درخواست
-                if not get_rate_limiter().acquire(timeout=30.0):
+                if not get_rate_limiter().acquire(timeout=15.0):
                     logger.warning("Rate limiter timeout, retrying...")
                     continue
 
-                resp = self.session.get(url, params=params, timeout=settings.REQUEST_TIMEOUT)
+                resp = self.session.get(
+                    url, params=params, timeout=settings.REQUEST_TIMEOUT
+                )
                 if resp.status_code == 429:
-                    wait = settings.REQUEST_DELAY * attempt * 2
-                    logger.warning("Rate limited by CoinGecko, sleeping %.1fs", wait)
+                    wait = min(
+                        settings.CG_429_BASE_WAIT * attempt,
+                        settings.CG_429_MAX_WAIT,
+                    )
+                    logger.warning(
+                        "Rate limited by CoinGecko, sleeping %.1fs (attempt %d/%d)",
+                        wait, attempt, max_retries,
+                    )
                     time.sleep(wait)
+                    # روی آخرین تلاش تاریخچه: خالی برگردان تا کل اسکن گیر نکند
+                    if is_history and attempt >= max_retries:
+                        logger.warning(
+                            "CG history skipped after rate-limit: %s", path
+                        )
+                        return {} if "market_chart" in path else []
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-                # ذخیره در کش
                 if use_cache:
                     self.cache.set(data, cache_key)
                 return data
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
-                logger.warning("Attempt %d/%d failed for %s: %s",
-                               attempt, settings.MAX_RETRIES, path, exc)
-                time.sleep(settings.REQUEST_DELAY)
-        raise RuntimeError(f"CoinGecko request failed after {settings.MAX_RETRIES} retries: {last_error}")
+                logger.warning(
+                    "Attempt %d/%d failed for %s: %s",
+                    attempt, max_retries, path, exc,
+                )
+                time.sleep(min(settings.REQUEST_DELAY, 1.0))
+        if is_history:
+            logger.warning("CG history failed, returning empty: %s", path)
+            return {} if "market_chart" in path else []
+        raise RuntimeError(
+            f"CoinGecko request failed after {max_retries} retries: {last_error}"
+        )
 
     # ------------------------------------------------------------------ #
     # public API

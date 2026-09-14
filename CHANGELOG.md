@@ -4,6 +4,23 @@
 
 ---
 
+## [V1.4.1] - 2026-09-14
+
+### ⚡ سرعت
+- fail-fast برای تاریخچه CoinGecko (حداکثر ۲ retry، sleep حداکثر ۴ث) تا دیگر ~۸۰ث معطل rate-limit نشود
+- تأخیر بین کوین‌ها: ۰.۱۵ث (KuCoin) / ۰.۵ث (سایر)
+- REQUEST_TIMEOUT و MAX_RETRIES کاهش یافت
+- MTF sleep کوتاه‌تر
+
+### 📨 تلگرام
+- خلاصه واضح: چند خرید / فروش / نگه‌داری
+- تفکیک بخش‌های 🟢 BUY / 🔴 SELL / 🟡 HOLD
+- هشتگ `#SYMBOL #BUY #MemeHunter`
+- لینک CoinGecko + TradingView + KuCoin
+- ذخیره `message_id` در `data/telegram_messages.csv` برای ریپلای بعدی
+
+---
+
 ## [V1.4.0] - 2026-09-14
 
 ### ✨ ویژگی جدید (Minor)
