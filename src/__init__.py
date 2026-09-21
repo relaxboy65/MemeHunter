@@ -30,7 +30,7 @@ from .notifier import (
 from .version import Version, read_version, write_version, bump_and_save, current_version_string
 from .logging_setup import (
     setup_logging, get_log_path, cleanup_old_logs,
-    log_run_summary, log_coin_analysis, log_data_source,
+    log_run_summary, log_coin_analysis, log_run_start, log_data_source,
     record_api_call, record_error, start_phase, end_phase,
     reset_run_stats, get_run_summary,
 )
@@ -49,6 +49,20 @@ from .paper_trading import (
     get_paper_trading_stats, format_paper_trading_report,
     get_open_positions, PaperPosition,
 )
+# V2.0 - ماژول‌های جدید حرفه‌ای
+from .walk_forward import (
+    run_walk_forward_analysis, format_walk_forward_report,
+    WalkForwardResult, WalkForwardReport,
+)
+from .cost_model import estimate_costs, apply_costs_to_return, get_cost_tier, TradeCosts
+from .monte_carlo import run_monte_carlo, format_monte_carlo_report, MonteCarloResult
+from .regime_detector import detect_regime, format_regime_report, MarketRegime, RegimeResult
+from .funding_oi import FundingOIClient, FundingOIResult, format_funding_oi_report
+from .smc_detector import analyze_smc, format_smc_report, SMCResult
+from .wyckoff import analyze_wyckoff, WyckoffResult
+from .kelly_sizing import compute_kelly, volatility_targeting, combined_sizing, KellyResult
+from .sentiment import get_sentiment, SentimentResult
+from .portfolio import analyze_portfolio, PortfolioResult
 
 __all__ = [
     # config

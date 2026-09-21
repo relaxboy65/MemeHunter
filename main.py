@@ -80,6 +80,7 @@ from src import (
     VolumeAlert,
     log_run_summary,
     log_coin_analysis,
+    log_run_start,
     log_data_source,
     record_api_call,
     record_error,
@@ -576,6 +577,12 @@ def main() -> int:
 
     version = current_version_string()
     start_time = time.time()
+    log_run_start(version, limit=getattr(args, "limit", 0), flags={
+        "advanced": bool(getattr(args, "advanced", False)),
+        "real_data": bool(getattr(args, "real_data", False)),
+        "telegram": bool(getattr(args, "telegram", False)),
+        "format": getattr(args, "format", "table"),
+    })
     logger.info("%s شروع به کار کرد - نسخه %s", settings.PROJECT_NAME, version)
 
     print()
@@ -636,6 +643,15 @@ def main() -> int:
     if not results:
         print("هیچ نتیجه‌ای برای نمایش وجود ندارد.")
         logger.warning("اسکن بدون نتیجه پایان یافت")
+        duration = time.time() - start_time
+        log_run_summary({
+            "duration_seconds": round(duration, 2),
+            "status": "empty",
+            "total_coins": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "hold_count": 0,
+        })
         return 1
 
     # V1.3.0 - بررسی پوزیشن‌های paper trading باز
@@ -795,9 +811,22 @@ def main() -> int:
     duration = time.time() - start_time
     logger.info("%s با موفقیت پایان یافت - نسخه %s - مدت: %.1f ثانیه",
                 settings.PROJECT_NAME, version, duration)
+    # همگام telegram_message_id در آمار
+    try:
+        from src.logging_setup import get_run_summary as _grs
+        for c in _grs().get("coins", []):
+            for r in results:
+                if r.symbol == c.get("symbol") and getattr(r, "telegram_message_id", None):
+                    c["telegram_message_id"] = r.telegram_message_id
+    except Exception:
+        pass
     log_run_summary({
         "duration_seconds": round(duration, 2),
         "status": "success",
+        "total_coins": len(results) if results else 0,
+        "buy_count": sum(1 for r in results if r.signal == Signal.BUY),
+        "sell_count": sum(1 for r in results if r.signal == Signal.SELL),
+        "hold_count": sum(1 for r in results if r.signal == Signal.HOLD),
     })
     return 0
 

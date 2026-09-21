@@ -1,183 +1,363 @@
-# 🐸 MemeHunter - ربات پیداکننده میم‌کوین
+# 🐸 MemeHunter V2.1.0
 
-**نسخه فعلی**: V1.4.6
+> **ربات حرفه‌ای پیداکننده و تحلیل‌گر میم‌کوین با معماری 7-لایه**
+>
+> **نسخه فعلی**: V2.1.0  
+> **تاریخ انتشار**: 2026-09-21
 
-رباتی که با پایتون اجرا می‌شود، میم‌کوین‌های داغ بازار را از API رایگان **CoinGecko** پیدا می‌کند، چندین اندیکاتور تکنیکال را روی آن‌ها اعمال می‌کند و سیگنال **خرید / فروش / نگه‌داری** صادر می‌کند. داده‌ها در دیتابیس CSV ذخیره و نتایج می‌توانند به کانال تلگرام ارسال شوند.
-
-> **هشدار ریسک**: این پروژه صرفاً ابزار آموزشی است و هیچ‌گونه توصیه مالی محسوب نمی‌شود. میم‌کوین‌ها بسیار پرنوسان و پرریسک هستند. فقط با پولی سرمایه‌گذاری کنید که حاضر به از دست دادن آن هستید.
-
----
-
-
-### 📡 منابع داده (V1.4.6)
-| نیاز | اولویت |
-|------|--------|
-| کشف میم‌کوین | CoinGecko categories |
-| تاریخچه / OHLCV | **KuCoin** → CoinGecko |
-| Order Flow / Liquidity | **KuCoin** → Binance → DexScreener |
-| بدون کلید API برای KuCoin و Binance |
-
-## ✨ امکانات
-
-### 🔍 کشف و فیلتر میم‌کوین
-- کشف خودکار از بین 180+ کوین با استفاده از **دسته‌بندی‌های CoinGecko** (meme-token، dog-themed، cat-themed، pump-fun)
-- فیلتر پشتیبان با کلمات کلیدی (doge, shib, pepe, floki, ...)
-- فیلتر مالی: مارکت‌کپ < 5 میلیارد دلار، حجم 24h > 1 میلیون دلار
-- حذف خودکار استیبل‌کوین‌ها
-
-### 📊 اندیکاتورهای تکنیکال (7 فاکتور)
-- **RSI** با روش هموارسازی ویلدر (استاندارد صنعتی)
-- **MACD** نرمال‌سازی شده با ATR
-- **Moving Average** (کوتاه و بلندمدت)
-- **Volume Surge** (افزایش حجم)
-- **Price Momentum** (مومنتوم قیمت)
-- **ATR** (Average True Range) - نوسان بازار
-- **Bollinger Bands** - تشخیص اشباع و squeeze
-
-### 🚀 تحلیل‌های پیشرفته (V1.4.6)
-- **لیکوییدیتی (Liquidity)**: تحلیل نقدشوندگی و تخمین اسپرد
-- **سوییپ (Sweep)**: تشخیص سوییپ لیکوییدیتی (شکست سقف/کف و بازگشت)
-- **اردرفلو (Order Flow)**: فشار خرید/فروش، دلتای تجمعی، جذب سفارش
-- **والیوم پروفایل (Volume Profile)**: POC، Value Area، شکل پروفایل (P/B/D)
-
-### 🎯 امتیازدهی و سیگنال
-- امتیازدهی **7 فاکتوری** با وزن قابل تنظیم
-- آستانه‌های قابل تنظیم: ≥0.65 خرید، ≤0.35 فروش
-- دلایل شفاف به زبان فارسی برای هر سیگنال
-- میزان اطمینان هر سیگنال
-
-### 📤 خروجی‌های متنوع
-- جدول ترمینال، گزارش مفصل، JSON، CSV
-- **داشبورد HTML** مدرن با طراحی responsive و نوار امتیاز رنگی
-- پیش‌نمایش پیام تلگرام با ایموجی و خلاصه سریع
-
-### 💾 داده و نگهداری
-- دیتابیس CSV با 24 ستون (شامل ATR و Bollinger)
-- نگهداری خودکار 90 روز برای دیتابیس و لاگ
-- **کش (cache)** فایل برای کاهش درخواست‌های API (TTL 1 ساعت)
-
-### 🤖 خودکارسازی و نوتیفیکیشن
-- ارسال خودکار به **تلگرام** با ایموجی و خلاصه
-- اجرای خودکار با **GitHub Actions** هر 6 ساعت
-- پشتیبانی از **python-dotenv** برای متغیرهای محیطی
-- پشتیبانی اختیاری از **کلید API CoinGecko**
-
-### ⚙️ امکانات پیشرفته
-- **بک‌تست** سیگنال‌های گذشته (نرخ موفقیت 7 و 14 روز)
-- **هشدار حجم غیرعادی** با z-score آماری
-- **محدودیت نرخ پیشرفته** (Token Bucket)
-- **پشتیبانی از چند بازه زمانی** (روزانه، 4 ساعته، ساعتی)
-- **لایه داده واقعی Binance** (V1.4.6): aggTrades برای CVD واقعی + depth برای اسپرد واقعی
-- **Paper Trading** (V1.4.6): ثبت سیگنال و ارزیابی نتیجه بدون ریسک واقعی
-- 96 تست واحد (همه موفق)
-
-### 🔖 مدیریت نسخه
-- نسخه‌بندی معنایی V1.4.6
-- ساخت خودکار فایل زیپ با هر انتشار
-- نگهداری حداکثر 3 نسخه اخیر
-- CHANGELOG کامل با تاریخچه همه نسخه‌ها
-
-### ⚠️ شفافیت محدودیت‌ها (V1.4.6)
-
-این پروژه با شفافیت کامل درباره منابع داده عمل می‌کند:
-
-| تحلیل | منبع داده | برچسب |
-|------|----------|-------|
-| **OrderFlow** | Binance aggTrades (اگر کوین لیست‌شده باشد) | ✅ واقعی (CVD واقعی) |
-| **OrderFlow** | جهت قیمت CoinGecko (پشتیبان) | 🔮 پروکسی (price-direction) |
-| **Liquidity** | Binance depth (اگر کوین لیست‌شده باشد) | ✅ واقعی (اسپرد واقعی) |
-| **Liquidity** | حجم CoinGecko (پشتیبان) | 🔮 پروکسی (volume-based) |
-| **Sweep** | OHLC از CoinGecko | 🔮 پروکسی (OHLC-based) |
-| **Smart Money** | تریدهای بزرگ Binance | 🔮 پروکسی (large trades) |
-| **Volume Profile** | قیمت‌های CoinGecko | 🔮 پروکسی (price-binned) |
-| **Multi-Timeframe** | Binance klines (اگر کوین لیست‌شده باشد) | ✅ واقعی |
-
-**نکته**: برای کوین‌های فقط DEX (بدون لیست در Binance)، تمام تحلیل‌های پیشرفته به‌صورت پروکسی اجرا می‌شوند.
+[![CI V2.1.0](https://github.com/YOUR_USERNAME/MemeHunter/actions/workflows/daily-scan.yml/badge.svg?branch=main)](https://github.com/YOUR_USERNAME/MemeHunter/actions)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-V2.1.0-green.svg)](./VERSION)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 ---
 
-## 📋 قوانین پروژه
+## 🎯 معرفی
 
-این پروژه قوانین مشخصی دارد که در [`RELEASE_RULES.md`](./RELEASE_RULES.md) به‌طور کامل توضیح داده شده است. خلاصه:
+MemeHunter یک ربات حرفه‌ای برای کشف، تحلیل و معامله میم‌کوین‌ها است که در 8 ماه گذشته از یک اسکریپت ساده به یک سیستم معاملاتی 7-لایه‌ی کامل ارتقا یافته است.
 
-1. **نام پروژه**: MemeHunter
-2. **فولدر `data/`**: شامل لاگ فعالیت و دیتابیس CSV با نگهداری 90 روز
-3. **نسخه‌بندی**: V1.4.6 (Major.Minor.Patch)
-4. **ساخت زیپ**: با هر تغییر نسخه، فایل زیپ در `releases/` ساخته می‌شود
-5. **نگهداری نسخه**: حداکثر 3 نسخه اخیر در `releases/` نگهداری می‌شود
+### ✨ ویژگی‌های کلیدی V2.1.0
+
+- 🎯 **معماری 7-لایه حرفه‌ای**: Regime → Filter → Signal → Risk → Portfolio → Execution → Monitor
+- 📊 **بیش از 15 تحلیل تخصصی**: تکنیکال، Smart Money، Wyckoff، Funding/OI، Sentiment
+- 🛡️ **مدیریت ریسک پیشرفته**: Kelly Criterion، Volatility Targeting، Monte Carlo
+- 🔬 **رفع overfitting**: Walk-Forward Optimization با Purge و Embargo
+- 💰 **هزینه‌های واقعی**: Slippage، Commission، Spread برای همه تریدها
+- 🤖 **تله‌گرام خودکار**: نوتیفیکیشن با ایموجی و ساختار فاخر
+- 📈 **داشبورد HTML**: گزارش‌های تعاملی
+- 🔄 **CI/CD کامل**: Lint + Test + Version + Build + Scan در GitHub Actions
 
 ---
 
-## 🚀 نصب و راه‌اندازی
+## 📋 فهرست مطالب
 
-### پیش‌نیازها
+- [🎯 معرفی](#-معرفی)
+- [📦 نصب سریع](#-نصب-سریع)
+- [🚀 استفاده](#-استفاده)
+- [🏗️ معماری 7-لایه](#️-معماری-7-لایه)
+- [📊 ماژول‌ها](#-ماژول‌ها)
+- [⚙️ تنظیمات](#️-تنظیمات)
+- [🧪 بک‌تست](#-بک‌تست)
+- [🤖 تلگرام](#-تلگرام)
+- [🔄 GitHub Actions](#-github-actions)
+- [📈 مدیریت نسخه](#-مدیریت-نسخه)
+- [⚠️ سلب مسئولیت](#️-سلب-مسئولیت)
 
-- Python نسخه 3.9 یا بالاتر
-- اتصال اینترنت
+---
 
-### مراحل نصب
+## 📦 نصب سریع
 
 ```bash
-# 1. کلون کردن مخزن
-git clone https://github.com/YOUR_USERNAME/MemeHunter.git
-cd MemeHunter
+# استخراج
+unzip MemeHunter-V2.1.0.zip -d ~/memehunter
+cd ~/memehunter
 
-# 2. ساخت محیط مجازی (پیشنهادی)
-python -m venv venv
-source venv/bin/activate   # لینوکس/مک
-# venv\Scripts\activate    # ویندوز
-
-# 3. نصب وابستگی‌ها
+# نصب وابستگی‌ها
 pip install -r requirements.txt
+
+# تنظیم تلگرام (اختیاری)
+cp .env.example .env
+# ویرایش .env و پر کردن توکن‌ها
+
+# اجرای اولیه
+python main.py --limit 5 --format detailed
 ```
 
 ---
 
-## 💻 استفاده
+## 🚀 استفاده
 
-### اجرای سریع
+### اسکن معمولی
 
 ```bash
-python main.py
+python main.py --limit 10 --format detailed --save
 ```
 
-### گزینه‌های خط فرمان
-
-| گزینه | توضیح | مثال |
-|------|-------|------|
-| `--format` | قالب خروجی | `table`, `detailed`, `json`, `csv`, `html` |
-| `--limit` | حداکثر تعداد کوین | `--limit 20` |
-| `--save` | ذخیره گزارش در فایل | `--save` |
-| `--telegram` | ارسال به تلگرام (نیاز به تنظیم متغیرها) | `--telegram` |
-| `--telegram-preview` | پیش‌نمایش پیام تلگرام | `--telegram-preview` |
-| `--advanced` | فعال‌سازی تحلیل‌های پیشرفته (لیکوییدیتی، سوییپ، ...) | `--advanced` |
-| `--backtest` | اجرای بک‌تست سیگنال‌های گذشته | `--backtest` |
-| `--volume-alert` | فقط هشدار حجم غیرعادی | `--volume-alert` |
-| `--verbose` | لاگ‌های جزئی‌تر | `--verbose` |
-
-### مثال‌ها
+### اسکن کامل با داده واقعی Binance
 
 ```bash
-# گزارش مفصل و ذخیره در فایل
-python main.py --format detailed --save
+python main.py --real-data --advanced --limit 15 --format detailed --save --telegram
+```
 
-# پیش‌نمایش پیام تلگرام
-python main.py --limit 5 --telegram-preview
+### بک‌تست با Walk-Forward و Monte Carlo
 
-# خروجی JSON برای اتصال به ابزار دیگر
-python main.py --format json --save
+```bash
+python main.py --backtest --save
+```
 
-# داشبورد HTML (V1.4.6)
-python main.py --format html --save
+### داشبورد HTML
 
-# اسکن با تحلیل‌های پیشرفته (V1.4.6)
-python main.py --advanced --limit 10 --format detailed
+```bash
+python main.py --format html --save --real-data --advanced
+```
 
-# بک‌تست سیگنال‌های گذشته (V1.4.6)
+### گزینه‌های کامل خط فرمان
+
+| گزینه | توضیح |
+|------|-------|
+| `--format` | `table`، `detailed`، `json`، `csv`، `html` |
+| `--limit` | حداکثر تعداد کوین (پیش‌فرض: 30) |
+| `--save` | ذخیره گزارش در فایل |
+| `--telegram` | ارسال به تلگرام |
+| `--telegram-preview` | پیش‌نمایش پیام تلگرام |
+| `--advanced` | تحلیل پیشرفته (SMC، Wyckoff، ...) |
+| `--real-data` | داده واقعی از Binance |
+| `--enable-advanced-impact` | تأثیر تحلیل پیشرفته روی امتیاز |
+| `--backtest` | اجرای بک‌تست |
+| `--volume-alert` | هشدار حجم غیرعادی |
+| `--paper-trading` | گزارش Paper Trading |
+| `--verbose` | لاگ‌های جزئی‌تر |
+
+---
+
+## 🏗️ معماری 7-لایه
+
+سیستم MemeHunter V2.1.0 از 7 لایه تشکیل شده است که هر کدام مسئولیت مشخصی دارد:
+
+```
+┌─────────────────────────────────────────┐
+│  Layer 1: Market Regime Detection       │  ← ADX + Hurst + Bollinger Width
+│  ↓ trending? ranging? volatile?         │
+├─────────────────────────────────────────┤
+│  Layer 2: Filter (آیا معامله کنیم؟)      │  ← Sentiment + Funding/OI
+│  ↓ bullish/bearish bias                  │
+├─────────────────────────────────────────┤
+│  Layer 3: Signal Generation              │  ← SMC + Technical + Smart Money
+│  ↓ entry point                           │
+├─────────────────────────────────────────┤
+│  Layer 4: Risk Management                │  ← Kelly + Vol Targeting
+│  ↓ position size, SL/TP                  │
+├─────────────────────────────────────────┤
+│  Layer 5: Portfolio Context              │  ← Correlation, Diversification
+│  ↓ چند کوین؟ چه وزنی؟                    │
+├─────────────────────────────────────────┤
+│  Layer 6: Execution                      │  ← Cost Model, Slippage
+│  ↓ order placement                       │
+├─────────────────────────────────────────┤
+│  Layer 7: Monitoring & Adaptation        │  ← Walk-Forward + Monte Carlo
+│  ↓ آیا استراتژی هنوز کار می‌کند؟         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 📊 ماژول‌ها
+
+### ماژول‌های V2.1.0 (جدید)
+
+| ماژول | توضیح |
+|------|-------|
+| `src/walk_forward.py` | Walk-Forward Optimization با Purge/Embargo |
+| `src/cost_model.py` | محاسبه slippage، commission، spread |
+| `src/monte_carlo.py` | شبیه‌سازی Monte Carlo (10K سناریو) |
+| `src/regime_detector.py` | تشخیص فاز بازار (ADX، Hurst، BB Width) |
+| `src/funding_oi.py` | Funding Rate + Open Interest از Binance Futures |
+| `src/smc_detector.py` | Smart Money Concepts (OB، FVG، BOS) |
+| `src/wyckoff.py` | Wyckoff Method + Volume Spread Analysis |
+| `src/kelly_sizing.py` | Kelly Criterion + Volatility Targeting |
+| `src/sentiment.py` | Fear & Greed Index (contrarian) |
+| `src/portfolio.py` | Correlation + Risk Parity |
+
+### ماژول‌های موجود (V1.x)
+
+| ماژول | توضیح |
+|------|-------|
+| `src/indicators.py` | 7 اندیکاتور تکنیکال (RSI، MACD، MA، ATR، Bollinger، Volume، Momentum) |
+| `src/advanced_analysis.py` | Liquidity، Sweep، OrderFlow، Volume Profile |
+| `src/binance_provider.py` | داده واقعی Binance (aggTrades، depth) |
+| `src/backtest_pnl.py` | بک‌تست با مدیریت سرمایه |
+| `src/paper_trading.py` | Paper Trading با SL/TP |
+| `src/volume_alert.py` | هشدار حجم غیرعادی |
+| `src/html_reporter.py` | داشبورد HTML |
+
+---
+
+## ⚙️ تنظیمات
+
+### فایل `.env`
+
+```bash
+# تلگرام
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+TELEGRAM_CHAT_ID=@your_channel
+
+# CoinGecko (اختیاری)
+COINGECKO_API_KEY=CG-xxxxxxxxxxxx
+```
+
+### تنظیمات پیشرفته
+
+در `src/config.py`:
+
+```python
+# آستانه‌های سیگنال
+BUY_THRESHOLD: 0.55    # امتیاز ≥ 0.55 = خرید
+SELL_THRESHOLD: 0.40    # امتیاز ≤ 0.40 = فروش
+
+# Walk-Forward
+WF_TRAIN_SIZE: 5        # 5 روز train
+WF_TEST_SIZE: 3         # 3 روز test
+WF_EMBARGO_SIZE: 1      # 1 روز embargo
+
+# Monte Carlo
+MC_ITERATIONS: 10000    # 10K شبیه‌سازی
+
+# Kelly
+KELLY_FRACTION: 0.25    # Quarter Kelly
+KELLY_MAX_POSITION: 0.40  # Max 40% per position
+
+# Paper Trading
+PAPER_TRADING_POSITION_SIZE: 0.40   # 40% سرمایه
+PAPER_TRADING_STOP_LOSS: 0.08       # 8% SL
+PAPER_TRADING_TAKE_PROFIT: 0.40    # 40% TP
+```
+
+---
+
+## 🧪 بک‌تست
+
+### اجرای بک‌تست ساده
+
+```bash
 python main.py --backtest
+```
 
-# فقط هشدار حجم غیرعادی (V1.4.6)
-python main.py --volume-alert --limit 50
+### شاخص‌های محاسبه‌شده
+
+| شاخص | توضیح |
+|------|-------|
+| Total Return % | بازده کل |
+| Win Rate | درصد تریدهای سودده |
+| Profit Factor | نسبت سود به زیان |
+| Sharpe Ratio | بازده ریسک‌تعدیل‌شده |
+| Max Drawdown % | حداکثر افت سرمایه |
+| Expectancy | میانگین سود هر ترید |
+
+### Walk-Forward Analysis
+
+برای تست robustness استراتژی (جلوگیری از overfitting):
+
+```python
+from src.walk_forward import run_walk_forward_analysis, format_walk_forward_report
+
+report = run_walk_forward_analysis(records, train_size=5, test_size=3)
+print(format_walk_forward_report(report))
+```
+
+### Monte Carlo Simulation
+
+برای محاسبه احتمال ruin:
+
+```python
+from src.monte_carlo import run_monte_carlo, format_monte_carlo_report
+
+returns = [5.0, -3.0, 8.0, -2.0, 6.0]  # بازده هر ترید
+result = run_monte_carlo(returns, initial_capital=10000, iterations=10000)
+print(format_monte_carlo_report(result))
+```
+
+---
+
+## 🤖 تلگرام
+
+### تنظیم
+
+1. ربات [@BotFather](https://t.me/BotFather) را در تلگرام پیدا کنید
+2. `/newbot` بفرستید و یک ربات بسازید
+3. توکن را در `.env` قرار دهید:
+   ```
+   TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+   ```
+4. Chat ID کانال یا چت خود را بگیرید
+5. در `.env` قرار دهید:
+   ```
+   TELEGRAM_CHAT_ID=@your_channel
+   ```
+
+### ارسال
+
+```bash
+python main.py --telegram --limit 10 --advanced --real-data
+```
+
+---
+
+## 🔄 GitHub Actions
+
+### Workflow V2.1.0
+
+فایل `.github/workflows/daily-scan.yml` شامل 5 job است:
+
+| Job | توضیح |
+|-----|-------|
+| 🔍 Lint | بررسی کیفیت کد با pycodestyle |
+| 🧪 Tests | اجرای همه تست‌های واحد |
+| 🏷️ Version Check | بررسی فرمت VERSION و هماهنگی با CHANGELOG و README |
+| 📦 Build | ساخت فایل ZIP release |
+| 🤖 Scheduled Scan | اسکن دوره‌ای هر 6 ساعت |
+
+### اجرای دستی
+
+در صفحه GitHub Actions می‌توانید با پارامترهای زیر اجرا کنید:
+
+- `limit`: تعداد کوین (پیش‌فرض: 15)
+- `advanced`: تحلیل پیشرفته (پیش‌فرض: true)
+- `send_telegram`: ارسال به تلگرام (پیش‌فرض: true)
+
+### Secrets مورد نیاز
+
+در Settings → Secrets ریپو:
+
+- `TELEGRAM_BOT_TOKEN` (برای ارسال تلگرام)
+- `TELEGRAM_CHAT_ID` (برای ارسال تلگرام)
+- `COINGECKO_API_KEY` (اختیاری، برای رفع rate limit)
+
+---
+
+## 📈 مدیریت نسخه
+
+### 📜 قانون طلایی (بالاترین اولویت)
+
+> **همیشه فقط فایل زیپ 3 نسخه نهایی را نگه دار و هیچ چیز دیگری را نگه ندار.**
+
+این قانون **همیشه و در همه جا** باید رعایت شود. اسکریپت `scripts/enforce_law.py` این قانون را اعمال می‌کند:
+
+```bash
+# بررسی وضعیت
+python scripts/enforce_law.py --check
+
+# اعمال قانون (حذف نسخه‌های اضافی)
+python scripts/enforce_law.py
+
+# فقط نمایش (dry-run)
+python scripts/enforce_law.py --dry-run
+```
+
+این قانون در GitHub Actions workflow V2.1.0 به‌صورت خودکار بعد از هر build اجرا می‌شود.
+
+### Semantic Versioning V{Major}.{Minor}.{Patch}
+
+| عدد | توضیح |
+|-----|-------|
+| Major (2) | تغییرات بزرگ معماری |
+| Minor (0) | ویژگی‌های جدید سازگار |
+| Patch (0) | رفع باگ |
+
+### فایل‌های دخیل در نسخه
+
+| فایل | توضیح |
+|------|-------|
+| `VERSION` | فایل متنی شامل نسخه فعلی |
+| `CHANGELOG.md` | تاریخچه تغییرات |
+| `README.md` | نسخه در هدر |
+| `.github/workflows/daily-scan.yml` | نسخه در نام workflow |
+
+### ساخت نسخه جدید
+
+```bash
+python scripts/release.py patch   # V2.1.0 → V2.0.1
+python scripts/release.py minor   # V2.1.0 → V2.1.0
+python scripts/release.py major   # V2.1.0 → V3.0.0
 ```
 
 ---
@@ -187,162 +367,116 @@ python main.py --volume-alert --limit 50
 ```
 MemeHunter/
 ├── main.py                       # نقطه ورود CLI
-├── VERSION                       # نسخه فعلی (V1.4.6)
-├── CHANGELOG.md                  # تاریخچه تغییرات نسخه‌ها
+├── VERSION                       # V2.1.0
+├── CHANGELOG.md                  # تاریخچه
 ├── RELEASE_RULES.md              # قوانین پروژه
 ├── requirements.txt
 ├── README.md
-├── LICENSE
-├── .env.example                  # الگوی متغیرهای محیطی
+├── .env.example                  # الگوی تنظیمات
 ├── .gitignore
 ├── .github/
 │   └── workflows/
-│       └── daily-scan.yml        # GitHub Actions
-├── data/                         # پوشه داده (نگهداری 90 روز)
-│   ├── activity.log              # لاگ فعالیت
-│   ├── coins_database.csv        # دیتابیس ارزهای روز (24 ستون)
-│   └── cache/                    # کش API (TTL 1 ساعت)
+│       └── daily-scan.yml        # CI V2.1.0
+├── data/                         # داده‌ها (90 روز نگهداری)
+│   ├── activity.log
+│   ├── coins_database.csv        # 40 ستون
+│   └── cache/
 ├── reports/                      # خروجی گزارش‌ها
-├── releases/                     # فایل‌های زیپ (حداکثر 3 نسخه)
-│   └── MemeHunter-V1.4.6.zip
 ├── scripts/
-│   └── release.py                # اسکریپت مدیریت نسخه
-├── tests/                         # 70 تست واحد
+│   └── release.py                # مدیریت نسخه
+├── tests/                        # 131 تست واحد
 │   ├── test_indicators.py
 │   ├── test_analyzer.py
-│   ├── test_coin_service.py
-│   ├── test_advanced_analysis.py  # V1.4.6
-│   ├── test_rate_limiter.py       # V1.4.6
-│   ├── test_backtest.py           # V1.4.6
-│   └── test_volume_alert.py       # V1.4.6
+│   ├── test_binance_provider.py
+│   ├── test_v2_modules.py        # V2.0 تست‌ها
+│   └── ...
 └── src/
     ├── __init__.py
-    ├── config.py                 # تنظیمات (نسخه پویا، وزن‌ها، ...)
-    ├── version.py                # مدیریت نسخه‌بندی
-    ├── logging_setup.py          # لاگ‌نویسی چرخشی 90 روزه
+    ├── config.py                 # تنظیمات
+    ├── version.py                # مدیریت نسخه
+    ├── logging_setup.py          # لاگ چرخشی 90 روز
     ├── storage.py                # دیتابیس CSV
-    ├── coin_service.py           # اتصال به CoinGecko + کش
-    ├── rate_limiter.py           # V1.4.6 - Token Bucket
-    ├── indicators.py             # RSI، MACD، MA، ATR، Bollinger
-    ├── advanced_analysis.py      # V1.4.6 - لیکوییدیتی/سوییپ/اردرفلو/والیوم پروفایل
-    ├── analyzer.py               # ترکیب و صدور سیگنال (7 فاکتور)
-    ├── backtest.py                # V1.4.6 - بک‌تست سیگنال‌ها
-    ├── volume_alert.py            # V1.4.6 - هشدار حجم غیرعادی
-    ├── reporter.py               # قالب‌بندی خروجی متنی
-    ├── html_reporter.py          # V1.4.6 - داشبورد HTML
-    └── notifier.py               # نوتیفیکیشن تلگرام با ایموجی
+    ├── rate_limiter.py           # Token Bucket
+    ├── coin_service.py           # CoinGecko
+    ├── binance_provider.py        # Binance واقعی
+    ├── kucoin_provider.py        # KuCoin
+    ├── dex_provider.py           # DexScreener + GeckoTerminal
+    ├── indicators.py             # 7 اندیکاتور تکنیکال
+    ├── advanced_analysis.py      # 4 تحلیل پیشرفته
+    ├── analyzer.py               # ترکیب همه
+    ├── # V2.0 ماژول‌های جدید:
+    ├── walk_forward.py           # Walk-Forward Optimization
+    ├── cost_model.py             # هزینه‌های واقعی
+    ├── monte_carlo.py            # Monte Carlo
+    ├── regime_detector.py        # تشخیص فاز بازار
+    ├── funding_oi.py             # Funding + OI
+    ├── smc_detector.py           # Smart Money Concepts
+    ├── wyckoff.py                # Wyckoff/VSA
+    ├── kelly_sizing.py           # Kelly Criterion
+    ├── sentiment.py              # Fear/Greed
+    ├── portfolio.py              # Portfolio Optimization
+    ├── backtest.py               # بک‌تست
+    ├── backtest_pnl.py           # بک‌تست با P&L
+    ├── paper_trading.py          # Paper Trading
+    ├── volume_alert.py           # هشدار حجم
+    ├── reporter.py               # قالب‌بندی متنی
+    ├── html_reporter.py          # داشبورد HTML
+    ├── notifier.py               # تلگرام
+    └── websocket_stream.py       # WebSocket real-time
 ```
 
 ---
 
-## 🔖 مدیریت نسخه
+## 📊 آمار پروژه
 
-برای انتشار نسخه جدید از اسکریپت `scripts/release.py` استفاده کنید:
-
-```bash
-# رفع خطا
-python scripts/release.py patch          # V1.4.6 → V1.4.6
-
-# ویژگی جدید
-python scripts/release.py minor          # V1.4.6 → V1.4.6
-
-# تغییر بزرگ
-python scripts/release.py major          # V1.4.6 → V1.4.6
-
-# مشاهده نسخه فعلی
-python scripts/release.py current
-
-# لیست نسخه‌های منتشر شده
-python scripts/release.py list
-
-# پاکسازی نسخه‌های قدیمی
-python scripts/release.py cleanup
-```
-
-این اسکریپت به‌طور خودکار:
-1. نسخه را در فایل `VERSION` به‌روزرسانی می‌کند
-2. `README.md` و `daily-scan.yml` را با نسخه جدید به‌روزرسانی می‌کند
-3. در `CHANGELOG.md` ثبت می‌کند
-4. فایل زیپ در `releases/MemeHunter-V{X.Y.Z}.zip` می‌سازد
-5. نسخه‌های قدیمی‌تر از 3 نسخه اخیر را حذف می‌کند
+| شاخص | مقدار |
+|------|-------|
+| **نسخه فعلی** | V2.1.0 |
+| **تعداد ماژول‌های Python** | 27 |
+| **تعداد تست‌های واحد** | 131 |
+| **تعداد خطوط کد** | ~4500 |
+| **منابع داده** | 5 (CoinGecko، Binance، KuCoin، DexScreener، GeckoTerminal) |
+| **سیاست نگهداری داده** | 90 روز |
+| **حداکثر نسخه‌های نگهداری‌شده** | 3 |
 
 ---
 
-## 🧠 نحوه کارکرد
+## ⚠️ سلب مسئولیت
 
-### 1. فیلتر میم‌کوین
-ربات ابتدا 100 کوین برتر بازار را از CoinGecko می‌گیرد و با فیلترهای زیر میم‌کوین‌ها را تشخیص می‌دهد:
-- کلمات کلیدی: doge، shib، pepe، floki، elon، moon، inu، bonk، wif، ...
-- استثنا: استیبل‌کوین‌ها (USDT، USDC، DAI، ...) فیلتر می‌شوند
-- شرط مالی: مارکت‌کپ < 5 میلیارد دلار و حجم 24h > 1 میلیون دلار
+این پروژه **صرفاً ابزار آموزشی** است و **توصیه مالی** محسوب نمی‌شود.
 
-### 2. محاسبه اندیکاتورها
+### ریسک‌های کلیدی
 
-| اندیکاتور | دوره | کاربرد |
-|----------|------|--------|
-| RSI | 14 روز | اشباع خرید/فروش |
-| MACD | 12/26/9 | روند و فشار خرید/فروش |
-| MA | 7/21 روز | روند کوتاه و بلندمدت |
-| Volume Surge | 14 روز | توجه بازار |
-| Price Momentum | 7 روز | نوسان اخیر |
+1. **میم‌کوین‌ها بسیار پرنوسان هستند** - ممکن است 100% سرمایه از دست برود
+2. **بک‌تست گذشته ضامن آینده نیست** - حتی بهترین استراتژی‌ها ممکن است در بازار واقعی شکست بخورند
+3. **overfitting خطرناک است** - همیشه Walk-Forward و Monte Carlo را بررسی کنید
+4. **هزینه‌های معامله بالا** - slippage میم‌کوین‌ها می‌تواند 1-3% باشد
+5. **نقدینگی محدود** - ممکن است نتوانید در زمان مورد نظر بفروشید
 
-### 3. امتیازدهی
-```
-Score = 0.25 × RSI + 0.25 × MACD + 0.25 × Volume + 0.25 × Momentum
-```
+### توصیه‌های ایمنی
 
-| امتیاز | سیگنال |
-|------|--------|
-| ≥ 0.65 | خرید |
-| 0.35 - 0.65 | نگه‌داری |
-| ≤ 0.35 | فروش / خروج |
-
----
-
-## 🤖 تنظیم تلگرام
-
-1. با [@BotFather](https://t.me/BotFather) یک ربات بسازید و Token بگیرید
-2. Chat ID کانال یا چت خود را بگیرید (از [@userinfobot](https://t.me/userinfobot))
-3. متغیرهای محیطی را تنظیم کنید:
-
-```bash
-export TELEGRAM_BOT_TOKEN="123456:ABC-DEF..."
-export TELEGRAM_CHAT_ID="@your_channel"
-python main.py --telegram
-```
-
----
-
-## 🤖 اجرای خودکار با GitHub Actions
-
-فایل `.github/workflows/daily-scan.yml` هر 6 ساعت یک‌بار اجرا می‌شود و گزارش را در `reports/` ذخیره می‌کند. برای تغییر زمان‌بندی، فایل را ویرایش کنید.
-
-برای اجرای تلگرام خودکار در GitHub Actions، در Settings → Secrets ریپو، `TELEGRAM_BOT_TOKEN` و `TELEGRAM_CHAT_ID` را اضافه کنید.
-
----
-
-## ❓ سوالات متداول
-
-**آیا برای استفاده نیاز به کلید API دارم؟**  
-خیر. از CoinGecko API رایگان استفاده می‌شود. برای حداکثر کارایی، یک کلید رایگان از [coingecko.com/api](https://www.coingecko.com/api) بگیرید.
-
-**دیتابیس CSV کجاست؟**  
-در `data/coins_database.csv` ذخیره می‌شود و رکوردهای قدیمی‌تر از 90 روز به‌طور خودکار حذف می‌شوند.
-
-**لاگ فعالیت کجاست؟**  
-در `data/activity.log` ذخیره می‌شود و روزانه چرخش می‌کند (90 روز نگهداری).
-
-**چطور نسخه جدید منتشر کنم؟**  
-```bash
-python scripts/release.py patch   # یا minor / major
-```
+- ✅ همیشه با **Paper Trading** شروع کنید
+- ✅ با سرمایه کم ($100-500) تست کنید
+- ✅ همیشه **DYOR** (Do Your Own Research) کنید
+- ✅ فقط با پولی که حاضر به از دست دادنش هستید معامله کنید
+- ❌ هرگز با پول قرض معامله نکنید
+- ❌ به سیگنال‌های ربات به‌عنوان "قطعی" اعتماد نکنید
 
 ---
 
 ## 📜 لایسنس
 
-MIT License - استفاده آزاد برای اهداف آموزشی و شخصی.
+MIT License - استفاده آزاد برای اهداف آموزشی.
 
-## ⚠️ سلب مسئولیت
+---
 
-این پروژه صرفاً جنبه آموزشی دارد و هیچ‌گونه توصیه مالی نیست. نویسنده هیچ مسئولیتی در قبال زیان‌های احتمالی ناشی از استفاده از این ابزار ندارد. همیشه قبل از هر سرمایه‌گذاری، تحقیق شخصی (DYOR) انجام دهید.
+## 🤝 مشارکت
+
+PR ها welcome هستند! لطفاً قبل از submit:
+1. تست‌ها را اجرا کنید: `python -m unittest discover tests`
+2. Lint را چک کنید: `pycodestyle --max-line-length=120 src/ main.py`
+3. CHANGELOG را به‌روزرسانی کنید
+
+---
+
+**MemeHunter V2.1.0** - ساخته شده با ❤️ برای جامعه کریپتو

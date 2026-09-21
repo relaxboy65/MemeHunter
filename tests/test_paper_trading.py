@@ -60,18 +60,20 @@ class TestPaperTrading(unittest.TestCase):
         self.assertLess(closed.pnl_pct, 0)
 
     def test_stop_loss_trigger(self):
-        """بررسی hit کردن stop loss."""
+        """بررسی hit کردن stop loss (V1.5.0: SL=8%)."""
         open_position("TEST", "Test", entry_price=100, signal_score=0.8)
-        # قیمت به زیر SL می‌رود
-        closed = check_open_positions({"TEST": 85})  # SL ≈ 90 (10% below 100)
+        # قیمت به زیر SL می‌رود (SL = 8% below 100 = 92)
+        closed = check_open_positions({"TEST": 85})  # 85 < 92
         self.assertEqual(len(closed), 1)
         self.assertEqual(closed[0].close_reason, "stop_loss")
 
     def test_take_profit_trigger(self):
-        """بررسی hit کردن take profit."""
+        """بررسی hit کردن take profit (V1.5.0: TP=40%)."""
+        from src.config import settings
         open_position("TEST", "Test", entry_price=100, signal_score=0.8)
-        # قیمت به بالای TP می‌رود
-        closed = check_open_positions({"TEST": 125})  # TP = 120 (20% above 100)
+        # قیمت به بالای TP می‌رود (TP = 40% above 100 = 140)
+        tp_price = 100 * (1 + settings.PAPER_TRADING_TAKE_PROFIT) + 5  # بالای TP
+        closed = check_open_positions({"TEST": tp_price})
         self.assertEqual(len(closed), 1)
         self.assertEqual(closed[0].close_reason, "take_profit")
 

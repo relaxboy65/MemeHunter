@@ -20,29 +20,34 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual environments
 venv/
 env/
 ENV/
 .venv/
 .env
 
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
+# OS
 .DS_Store
 Thumbs.db
 
+# Reports (output)
 reports/
+*.log
 
+# Environment
 .env
 
-# data/: دیتابیس CSV در ریپو می‌ماند؛ لاگ ignore
+# Note: data/ folder is tracked selectively
+# activity.log files are git-ignored but coins_database.csv is tracked
+# cache/ is also ignored
 data/activity.log
 data/activity.log.*
 data/cache/
-data/.last_save
-data/telegram_messages.csv
-!data/.gitkeep
-!data/coins_database.csv
+

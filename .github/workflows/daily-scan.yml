@@ -1,6 +1,5 @@
-name: MemeHunter CI V1.4.6
+name: MemeHunter CI V2.1.0
 
-# نسخه ورک‌فلو باید با فایل VERSION هماهنگ باشد
 on:
   push:
     branches: [main, master]
@@ -31,80 +30,54 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    name: "Lint (pycodestyle) — V1.4.6"
+    name: "Lint — V2.1.0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install pycodestyle
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install pycodestyle
-      - name: Run pycodestyle
-        run: |
+      - run: |
           pycodestyle --max-line-length=120 --select=E9,F63,F7,F82 --show-source src/ main.py || true
           pycodestyle --max-line-length=120 --select=E9 src/ main.py
 
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    name: "Tests — V1.4.6"
+    name: "Tests — V2.1.0"
     needs: lint
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
-      - name: Run unit tests
-        run: python -m unittest discover tests -v
-      - name: Run pytest
-        continue-on-error: true
+      - run: python -m unittest discover tests -v
+      - continue-on-error: true
         run: pytest tests/ -v --tb=short || true
 
   version-check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    name: "Version Check — V1.4.6"
+    name: "Version Check — V2.1.0"
     needs: test
     steps:
       - uses: actions/checkout@v4
-      - name: Check VERSION file format
+      - name: Check VERSION
         run: |
-          if [ ! -f VERSION ]; then
-            echo "VERSION file missing"
-            exit 1
-          fi
           VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION || true)
-          if [ -z "$VERSION" ]; then
-            echo "Invalid VERSION format"
-            cat VERSION
-            exit 1
-          fi
+          test -n "$VERSION"
           echo "Version OK: $VERSION"
-          # نام ورک‌فلو باید شامل همین نسخه باشد
-          if ! grep -q "$VERSION" .github/workflows/daily-scan.yml; then
-            echo "ERROR: workflow file does not contain version $VERSION"
-            exit 1
-          fi
-          echo "Workflow name/version consistent with VERSION file"
-      - name: Check CHANGELOG entry
-        run: |
-          VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION)
-          if ! grep -q "$VERSION" CHANGELOG.md; then
-            echo "Warning: $VERSION not found in CHANGELOG.md"
-          else
-            echo "CHANGELOG has $VERSION"
-          fi
+          grep -q "$VERSION" .github/workflows/daily-scan.yml
 
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    name: "Scan — V1.4.6"
+    name: "Scan — V2.1.0"
     needs: version-check
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     env:
@@ -114,29 +87,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # برای commit بعدی به همین branch
           token: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Prepare folders
         run: |
           mkdir -p data reports
-          # اگر CSV هنوز فقط هدر دارد یا نیست، هدر را تضمین کن
           if [ ! -f data/coins_database.csv ]; then
             echo "scan_date,scan_timestamp,coin_id,symbol,name,current_price_usd,market_cap_usd,volume_24h_usd,change_24h_pct,change_7d_pct,rsi,macd_hist,ma_short,ma_long,ma_bullish,volume_surge_ratio,price_momentum_pct,score,signal,confidence,atr,atr_percent,bollinger_percent_b,bollinger_squeeze,liquidity_score,liquidity_is_real,liquidity_spread,liquidity_imbalance,sweep_detected,sweep_type,orderflow_buy_pressure,orderflow_sell_pressure,orderflow_is_real,large_swap_count,large_buys,large_sells,mtf_confluence_score,mtf_aligned_count,data_sources,telegram_message_id" > data/coins_database.csv
           fi
-          echo "=== data/ before scan ==="
-          ls -la data/
-          wc -l data/*.csv 2>/dev/null || true
-
+          ls -la data/; wc -l data/*.csv || true
       - name: Run MemeHunter scan
         run: |
           set -o pipefail
@@ -144,63 +108,52 @@ jobs:
           ADVANCED="${{ github.event.inputs.advanced || 'true' }}"
           SEND_TG="${{ github.event.inputs.send_telegram || 'true' }}"
           CMD="python main.py --limit $LIMIT --format detailed --save --verbose"
-          if [ "$ADVANCED" = "true" ]; then
-            CMD="$CMD --advanced --real-data"
-          fi
-          if [ "$SEND_TG" = "true" ]; then
-            CMD="$CMD --telegram"
-          fi
+          if [ "$ADVANCED" = "true" ]; then CMD="$CMD --advanced --real-data"; fi
+          if [ "$SEND_TG" = "true" ]; then CMD="$CMD --telegram"; fi
           echo "Running: $CMD"
           $CMD 2>&1 | tee reports/scan_console.log
-
       - name: Run backtest (best effort)
         continue-on-error: true
         run: python main.py --backtest --save 2>&1 | tee reports/backtest_console.log || true
-
-      - name: Verify data/ databases on disk
+      - name: Actions log digest
         if: always()
         run: |
-          echo "===== VERIFY data/ (must exist in repo folder) ====="
+          echo "========== ACTIONS LOG DIGEST =========="
+          grep -E "MH_RUN_START|MH_RUN_END" data/activity.log reports/scan_console.log 2>/dev/null || true
+          grep -A60 "RUN_REPORT" data/activity.log 2>/dev/null | head -50 || true
+          grep -E "PHASE_START:|PHASE_END:" data/activity.log 2>/dev/null || true
+          grep "ERROR_RECORDED" data/activity.log 2>/dev/null || true
+          grep "RUN_SUMMARY_JSON" data/activity.log 2>/dev/null | tail -1 || true
+          grep "DATA_SAVE_OK" data/activity.log 2>/dev/null || true
+          echo "========== END DIGEST =========="
+      - name: Verify data/
+        if: always()
+        run: |
           ls -la data/
-          if [ ! -f data/coins_database.csv ]; then
-            echo "ERROR: data/coins_database.csv missing"
-            exit 1
-          fi
-          echo "coins_database.csv lines: $(wc -l < data/coins_database.csv)"
-          head -3 data/coins_database.csv
-          echo "--- telegram_message_id sample ---"
-          head -3 data/coins_database.csv
-          python3 -c "import csv; r=list(csv.DictReader(open('data/coins_database.csv'))); print('rows',len(r)); print('last ids',[(x.get('symbol'),x.get('telegram_message_id')) for x in r[-5:]])" 2>/dev/null || true
-          if [ -f data/activity.log ]; then
-            echo "activity.log size: $(wc -c < data/activity.log) bytes"
-            tail -n 30 data/activity.log
-          fi
-          grep "DATA_SAVE_OK\|RUN_SUMMARY_JSON" data/activity.log || true
-
-      # دیتابیس‌ها داخل فولدر data/ ریپو commit می‌شوند (نه Artifact)
-      - name: Commit data/ databases to repository
+          test -f data/coins_database.csv
+          echo "lines: $(wc -l < data/coins_database.csv)"
+      - name: Commit data/ databases
         if: always()
         run: |
           set -e
           git config user.name "MemeHunter-Bot"
           git config user.email "memehunter-bot@users.noreply.github.com"
-          # فقط فایل‌های دیتابیس CSV — لاگ activity به گیت نمی‌رود
           git add data/coins_database.csv data/.gitkeep || true
           if git diff --cached --quiet; then
-            echo "No database changes to commit"
+            echo "No DB changes"
           else
-            VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION || echo V1.4.6)
+            VERSION=$(grep -E '^V[0-9]+\.[0-9]+\.[0-9]+$' VERSION || echo V2.1.0)
             git commit -m "data: update databases after scan ($VERSION) [skip ci]"
             git push origin HEAD:${{ github.ref_name }}
-            echo "Pushed data/ CSV databases to repository"
           fi
-
-      # Artifact فقط برای چک لاگ کامل کار (بدون دیتابیس)
-      - name: Upload full work log only (Artifacts)
+      - name: Enforce golden rule
+        if: always()
+        run: python scripts/enforce_law.py --dry-run || true
+      - name: Upload logs only (Artifacts)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: memehunter-V1.4.6-log-${{ github.run_id }}
+          name: memehunter-V2.1.0-log-${{ github.run_id }}
           path: |
             data/activity.log
             reports/scan_console.log
