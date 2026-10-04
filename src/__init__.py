@@ -63,6 +63,8 @@ from .wyckoff import analyze_wyckoff, WyckoffResult
 from .kelly_sizing import compute_kelly, volatility_targeting, combined_sizing, KellyResult
 from .sentiment import get_sentiment, SentimentResult
 from .portfolio import analyze_portfolio, PortfolioResult
+# V2.2.0 - Pump Prediction
+from .pump_predictor import predict_pump, format_pump_signal, PumpSignal, PumpPhase
 
 __all__ = [
     # config
