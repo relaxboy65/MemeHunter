@@ -1,3 +1,13 @@
+# Changelog
+
+## V2.3.1
+- Added sensitive discovery tiers: WATCH/CANDIDATE/STRONG/EXTREME.
+- Kept BUY gated at 2 confirmations + `PUMP_MIN_SCORE` (0.62).
+- Added always-on liquidity risk bands (<$50K block, <$100K caution, <$250K reduced sizing).
+- Added ATR risk sizing: 15%/25%/30% bands without automatically vetoing high-volatility setups.
+- Added position/liquidity exposure checks.
+- Exposed risk tier, ATR and position-size multiplier in JSON reports.
+
 # 📜 CHANGELOG - MemeHunter
 
 ---
@@ -291,3 +301,12 @@
 - لاگ چرخشی روزانه
 - GitHub Actions
 - نسخه‌بندی معنایی
+
+## [V2.3.0] - 2026-10-04 - Major (Pump Hunter)
+- Integrated Pump Predictor into the main scan pipeline.
+- Fixed Pump Score normalization so missing evidence cannot inflate a score to 1.0.
+- Added minimum confirmation gating for BUY pump signals.
+- Added tradeability/risk gate based on observable liquidity, spread, volume/market-cap and market-cap risk.
+- Added pump/risk fields to AnalysisResult and JSON/detailed reports.
+- Added risk-based paper-trading configuration limits.
+- Expanded MTF configuration to 1d/4h/1h/15m.

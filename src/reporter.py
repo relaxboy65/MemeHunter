@@ -82,6 +82,10 @@ def format_detailed(results: List[AnalysisResult]) -> str:
         lines.append(f"  تغییر 7 روز:      {r.change_7d_pct:+.2f}%")
         lines.append(f"  امتیاز نهایی:      {r.score:.3f}/1.000")
         lines.append(f"  اطمینان:           {r.confidence*100:.1f}%")
+        if r.pump:
+            lines.append(f"  Pump Score:        {r.pump.get('pump_score', 0):.3f} | confirmations={r.pump.get('confirmations', 0)} | action={r.pump.get('action', 'WAIT')}")
+        if r.risk:
+            lines.append(f"  Risk Gate:         {r.risk.get('risk_level', 'UNKNOWN')} | tradeable={r.risk.get('tradeable', False)}")
         lines.append("  دلایل:")
         for reason in r.reasons:
             lines.append(f"    - {reason}")

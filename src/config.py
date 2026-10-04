@@ -95,6 +95,26 @@ class Settings:
     ORDERFLOW_API_URL: str = os.getenv("ORDERFLOW_API_URL", "")
 
     TOP_N_COINS: int = 100
+    # V2.3 Pump Hunter
+    # V2.3.1 signal tiers: lower threshold is for discovery only; trade gate stays strict.
+    PUMP_WATCH_MIN_SCORE: float = 0.55
+    PUMP_MIN_SCORE: float = 0.62
+    PUMP_CANDIDATE_MIN_CONFIRMATIONS: int = 1
+    PUMP_MIN_CONFIRMATIONS: int = 2
+    # Always-on market risk thresholds.
+    RISK_MIN_LIQUIDITY_USD: float = 50_000.0
+    RISK_CAUTION_LIQUIDITY_USD: float = 100_000.0
+    RISK_NORMAL_LIQUIDITY_USD: float = 250_000.0
+    RISK_MAX_POSITION_LIQUIDITY_RATIO: float = 0.02
+    RISK_ATR_CAUTION_PCT: float = 15.0
+    RISK_ATR_HIGH_PCT: float = 25.0
+    RISK_ATR_EXTREME_PCT: float = 30.0
+    RISK_MAX_SCORE: float = 0.45
+    ENABLE_PUMP_HUNTER: bool = True
+    # Risk-based sizing: fraction of equity risked if stop is hit.
+    PAPER_TRADING_RISK_PER_TRADE: float = 0.01
+    PAPER_TRADING_MAX_POSITION: float = 0.15
+    PAPER_TRADING_MIN_POSITION: float = 0.02
     MAX_MARKET_CAP_USD: float = 5_000_000_000
     MIN_24H_VOLUME_USD: float = 1_000_000
     HISTORY_DAYS: int = 30
@@ -157,7 +177,7 @@ class Settings:
 
     # === چند بازه زمانی (Multi-timeframe) ===
     ENABLE_MULTI_TIMEFRAME: bool = True
-    TIMEFRAMES: tuple = ("1d", "4h")  # روزانه + 4 ساعته
+    TIMEFRAMES: tuple = ("1d", "4h", "1h", "15m")  # regime -> trigger
     MTF_SLEEP: float = 0.05  # V1.4.2 - فاصله بین تایم‌فریم‌ها
     # آستانه confluence: حداقل چند بازه باید هم‌جهت باشند
     MTF_CONFLUENCE_MIN: int = 2
@@ -170,7 +190,7 @@ class Settings:
     ENABLE_PAPER_TRADING: bool = True
     PAPER_TRADING_INITIAL_CAPITAL: float = 10_000.0  # دلار
     # V1.5.0 - بهینه‌سازی شده بر اساس بک‌تست: pos=40% با 100% win rate و +27.12% بازده
-    PAPER_TRADING_POSITION_SIZE: float = 0.40  # 40% سرمایه برای هر پوزیشن
+    PAPER_TRADING_POSITION_SIZE: float = 0.10  # 40% سرمایه برای هر پوزیشن
     PAPER_TRADING_MAX_POSITIONS: int = 5
     # V1.5.0 - SL/TP بهینه شده: SL=8%, TP=40%
     PAPER_TRADING_STOP_LOSS: float = 0.08   # 8% حد ضرر
@@ -202,7 +222,7 @@ class Settings:
 
     # Kelly Sizing
     KELLY_FRACTION: float = 0.25  # Quarter Kelly
-    KELLY_MAX_POSITION: float = 0.40  # Max 40% per position
+    KELLY_MAX_POSITION: float = 0.15  # Max 40% per position
     VOL_TARGET_PCT: float = 5.0   # Target portfolio volatility 5%
 
     # Regime Detection

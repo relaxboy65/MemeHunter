@@ -88,9 +88,12 @@ from src import (
     end_phase,
     reset_run_stats,
     get_run_summary,
+    predict_pump,
 )
 from src.binance_provider import BinanceClient
 from src.kucoin_provider import KuCoinClient
+from src.risk_engine import assess_trade_risk
+from src.funding_oi import FundingOIClient
 from src.paper_trading import (
     open_position, close_position, check_open_positions,
     get_paper_trading_stats, format_paper_trading_report,
@@ -130,6 +133,7 @@ def run_scan(limit: int = 50, advanced: bool = False,
     # V1.4.0 - KuCoin اولویت اول؛ Binance پشتیبان
     kucoin = KuCoinClient() if (real_data or settings.ENABLE_KUCOIN) else None
     binance = BinanceClient() if (real_data and settings.ENABLE_BINANCE) else None
+    funding_client = FundingOIClient() if (real_data and settings.ENABLE_BINANCE) else None
 
     # V1.3.1 - WebSocket اختیاری
     ws_manager = None
@@ -219,6 +223,7 @@ def run_scan(limit: int = 50, advanced: bool = False,
             real_orderflow = None
             real_liquidity = None
             mtf_data = None
+            funding_oi = None
             has_real_data = False
 
             if kucoin is not None:
@@ -337,6 +342,16 @@ def run_scan(limit: int = 50, advanced: bool = False,
                     record_api_call("binance", "skipped", f"{symbol} not listed")
                     end_phase(f"binance_check_{symbol}", {"available": False})
 
+            # V2.3 - Funding/OI is a separate derivatives confirmation layer.
+            if funding_client is not None:
+                try:
+                    funding_oi = funding_client.analyze(symbol, current_price)
+                    if funding_oi:
+                        record_api_call("binance_futures", "success", f"funding_oi {symbol}")
+                except (requests.exceptions.RequestException, ValueError, KeyError, RuntimeError) as exc:
+                    record_api_call("binance_futures", "failed", f"funding_oi {symbol}: {exc}")
+                    logger.debug("  Funding/OI failed: %s", exc)
+
             # DexScreener فقط اگر هنوز liquidity واقعی نداریم
             if dex_client and real_liquidity is None:
                 try:
@@ -379,15 +394,47 @@ def run_scan(limit: int = 50, advanced: bool = False,
                 )
 
             result = analyze_coin(coin, indicators, advanced_pack=advanced_pack)
+
+            # V2.3 Pump Hunter: pre-pump engine is now part of the live scan.
+            pump_signal = predict_pump(
+                prices=prices, volumes=volumes, highs=highs, lows=lows,
+                closes=prices, current_price=current_price,
+                real_orderflow=real_orderflow, real_liquidity=real_liquidity,
+                funding_oi=funding_oi,
+            ) if settings.ENABLE_PUMP_HUNTER else None
+
+            risk = assess_trade_risk(
+                market_cap=market_cap, volume_24h=coin.get("total_volume") or 0.0,
+                current_price=current_price, liquidity=real_liquidity,
+                pump_score=pump_signal.pump_score if pump_signal else 0.0,
+                distribution_score=pump_signal.distribution_score if pump_signal else 0.0,
+                atr_pct=(getattr(indicators.atr, "atr_percent", 0.0) if getattr(indicators, "atr", None) else 0.0),
+            )
+
+            if pump_signal is not None:
+                pump_signal.risk_gate = "PASS" if risk.tradeable else "BLOCK"
+                result.pump = pump_signal.to_dict()
+                result.risk = risk.to_dict()
+                if pump_signal.action == "BUY" and not risk.tradeable:
+                    pump_signal.action = "NO_TRADE"
+                    result.pump["action"] = "NO_TRADE"
+                    result.reasons.append("Pump Hunter: سیگنال قوی است ولی Risk Gate اجازه ورود نمی‌دهد")
+                if pump_signal.action == "BUY":
+                    result.reasons.insert(0, f"Pump Hunter: score={pump_signal.pump_score:.2f}, confirmations={pump_signal.confirmations}")
+
             results.append(result)
 
             log_coin_analysis(symbol, coin_id, result.signal.value,
                               result.score, result.data_sources,
                               is_real_data=has_real_data)
 
-            logger.info("  سیگنال: %s | امتیاز: %.3f | تاریخچه: %s | داده‌ها: %s",
-                        result.signal.value, result.score, history_source,
-                        result.data_sources or "پایه")
+            logger.info(
+                "  سیگنال: %s | base=%.3f | pump=%s | confirmations=%s | risk=%s | تاریخچه: %s | داده‌ها: %s",
+                result.signal.value, result.score,
+                f"{pump_signal.pump_score:.3f}" if pump_signal else "-",
+                pump_signal.confirmations if pump_signal else 0,
+                risk.level if pump_signal else "-",
+                history_source, result.data_sources or "پایه")
         except (requests.exceptions.RequestException, ValueError, KeyError,
                 OSError, RuntimeError) as exc:
             errors_count += 1

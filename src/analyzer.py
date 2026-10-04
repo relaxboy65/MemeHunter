@@ -176,6 +176,8 @@ class AnalysisResult:
     # V1.3.0 - داده‌های پیشرفته
     advanced: dict = field(default_factory=dict)
     data_sources: str = ""             # خلاصه منابع داده
+    pump: dict = field(default_factory=dict)
+    risk: dict = field(default_factory=dict)
     telegram_message_id: object = None  # message_id تلگرام برای ریپلای بعدی
 
     def to_dict(self) -> dict:
@@ -195,6 +197,8 @@ class AnalysisResult:
             "indicators": self.indicators,
             "advanced": self.advanced,
             "data_sources": self.data_sources,
+            "pump": self.pump,
+            "risk": self.risk,
             "telegram_message_id": self.telegram_message_id,
         }
 
@@ -360,4 +364,6 @@ def analyze_coin(coin: dict, indicators: IndicatorPack,
         indicators=indicators.to_dict(),
         advanced=advanced_dict,
         data_sources=data_sources,
+        pump={},
+        risk={},
     )

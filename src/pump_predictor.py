@@ -51,7 +51,10 @@ class PumpSignal:
     pump_score: float = 0.0          # 0..1 - احتمال پامپ
     distribution_score: float = 0.0  # 0..1 - احتمال توزیع
     # توصیه
-    action: str = "WAIT"             # BUY / HOLD / SELL / WAIT
+    action: str = "WAIT"             # BUY / HOLD / SELL / WAIT / NO_TRADE
+    confirmations: int = 0
+    risk_gate: str = "UNKNOWN"
+    signal_tier: str = "IGNORE"
     entry_zone: Optional[tuple] = None  # (lower, upper) قیمت پیشنهادی ورود
     stop_loss_pct: float = 0.08       # حد ضرر پیشنهادی
     take_profit_pct: float = 0.30    # حد سود پیشنهادی
@@ -65,6 +68,9 @@ class PumpSignal:
             "pump_score": round(self.pump_score, 3),
             "distribution_score": round(self.distribution_score, 3),
             "action": self.action,
+            "confirmations": self.confirmations,
+            "risk_gate": self.risk_gate,
+            "signal_tier": self.signal_tier,
             "entry_zone": [round(self.entry_zone[0], 6), round(self.entry_zone[1], 6)]
                         if self.entry_zone else None,
             "stop_loss_pct": self.stop_loss_pct,
@@ -441,11 +447,36 @@ def predict_pump(prices: List[float],
                 f"Spring pattern: تست کف {spring['min_low']:.6f} و برگشت با حجم کم"
             )
 
-    # نرمال‌سازی pump_score بر اساس تعداد نشانه‌های موجود
-    if evidence_count > 0:
-        pump_score = pump_score / (evidence_count * 0.20)  # نرمال‌سازی
+    # نرمال‌سازی صحیح: فقط وزن فاکتورهای موجود در مخرج می‌آید.
+    # نسخه قبلی evidence_count * 0.20 باعث می‌شد یک فاکتور تنها
+    # بتواند به‌اشتباه Pump Score=1.0 تولید کند.
+    available_weight = 0.0
+    weighted_score = 0.0
+    if buildup:
+        weighted_score += buildup["buildup_score"] * 0.30
+        available_weight += 0.30
+    if squeeze:
+        weighted_score += squeeze["squeeze_score"] * 0.20
+        available_weight += 0.20
+    if smart_money:
+        weighted_score += smart_money["smart_money_score"] * 0.25
+        available_weight += 0.25
+    if short_squeeze:
+        weighted_score += short_squeeze["short_squeeze_score"] * 0.15
+        available_weight += 0.15
+    if spring:
+        weighted_score += spring["spring_score"] * 0.10
+        available_weight += 0.10
 
+    pump_score = weighted_score / available_weight if available_weight else 0.0
     signal.pump_score = min(1.0, pump_score)
+    signal.confirmations = sum([
+        bool(buildup and buildup["buildup_score"] >= 0.7),
+        bool(squeeze and squeeze["squeeze_score"] >= 0.7),
+        bool(smart_money and smart_money["is_smart_money_buying"]),
+        bool(short_squeeze and short_squeeze["is_short_squeeze_setup"]),
+        bool(spring and spring["is_spring"]),
+    ])
 
     # ===== تشخیص post-pump (توزیع) =====
     # اگر قیمت اخیر به‌شدت بالا رفته (10%+ در 3 روز)
@@ -484,6 +515,18 @@ def predict_pump(prices: List[float],
 
     signal.distribution_score = min(1.0, distribution_score)
 
+    # ===== tiering: discovery can be sensitive, trading remains strict =====
+    if signal.pump_score >= 0.82 and signal.confirmations >= 3:
+        signal.signal_tier = "EXTREME"
+    elif signal.pump_score >= 0.72 and signal.confirmations >= 3:
+        signal.signal_tier = "STRONG"
+    elif signal.pump_score >= settings.PUMP_MIN_SCORE and signal.confirmations >= settings.PUMP_CANDIDATE_MIN_CONFIRMATIONS:
+        signal.signal_tier = "CANDIDATE"
+    elif signal.pump_score >= settings.PUMP_WATCH_MIN_SCORE:
+        signal.signal_tier = "WATCH"
+    else:
+        signal.signal_tier = "IGNORE"
+
     # ===== تصمیم‌گیری =====
     if signal.distribution_score >= 0.6:
         # توزیع قوی → SELL
@@ -497,7 +540,7 @@ def predict_pump(prices: List[float],
         signal.action = "SELL"
         signal.confidence = signal.distribution_score
         signal.expected_move_pct = -10
-    elif signal.pump_score >= 0.6:
+    elif signal.pump_score >= settings.PUMP_MIN_SCORE and signal.confirmations >= settings.PUMP_MIN_CONFIRMATIONS:
         # انباشت قوی → BUY
         signal.phase = PumpPhase.READY_TO_PUMP
         signal.action = "BUY"
@@ -508,10 +551,10 @@ def predict_pump(prices: List[float],
         signal.entry_zone = (current_price * 0.98, current_price * 1.02)
         signal.stop_loss_pct = 0.08
         signal.take_profit_pct = 0.30
-    elif signal.pump_score >= 0.4:
-        # انباشت متوسط → BUY (با احتیاط)
+    elif signal.pump_score >= settings.PUMP_WATCH_MIN_SCORE and signal.confirmations >= settings.PUMP_CANDIDATE_MIN_CONFIRMATIONS:
+        # Discovery signal: one confirmation is enough for CANDIDATE/WATCH, never for BUY.
         signal.phase = PumpPhase.ACCUMULATION
-        signal.action = "BUY"
+        signal.action = "WAIT"
         signal.confidence = signal.pump_score * 0.7
         signal.expected_move_pct = 15
         signal.entry_zone = (current_price * 0.97, current_price * 1.03)
