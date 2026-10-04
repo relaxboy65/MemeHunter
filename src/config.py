@@ -181,8 +181,8 @@ class Settings:
 
     # V2.0 - آستانه‌های واقع‌بینانه (پس از Walk-Forward)
     # قبلاً 0.50 بود ولی باعث overfitting شد. 0.55 متعادل‌تر است.
-    BUY_THRESHOLD: float = 0.55
-    SELL_THRESHOLD: float = 0.40
+    BUY_THRESHOLD: float = 0.52  # V2.1.1 - تنظیم بر اساس توزیع واقعی
+    SELL_THRESHOLD: float = 0.43  # V2.1.1 - تنظیم متعادل
 
     # === V2.0 - تنظیمات جدید حرفه‌ای ===
     # Walk-Forward
