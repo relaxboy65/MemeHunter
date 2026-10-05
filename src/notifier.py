@@ -28,7 +28,7 @@ logger = logging.getLogger(settings.PROJECT_SLUG)
 SIGNAL_BADGE = {
     Signal.BUY: "🟢 BUY",
     Signal.SELL: "🔴 SELL",
-    Signal.WAIT: "🟡 HOLD",
+    Signal.WAIT: "🟡 WAIT",
 }
 
 
@@ -71,7 +71,7 @@ def _coin_tag(symbol: str) -> str:
 
 def format_coin_message(r: AnalysisResult, run_meta: Optional[dict] = None) -> str:
     """ساخت متن پیام جداگانه برای یک ارز."""
-    badge = SIGNAL_BADGE.get(r.signal, "🟡 HOLD")
+    badge = SIGNAL_BADGE.get(r.signal, "🟡 WAIT")
     lines: List[str] = []
     lines.append(f"{badge}  {r.name} ({r.symbol})")
     lines.append("───────────────")
@@ -292,7 +292,11 @@ def notify_results(
         all_ids.extend(ids)
 
     sorted_results = sorted(results, key=lambda r: r.score, reverse=True)
+    # V2.8.0: فقط BUY و SELL به تلگرام ارسال شود (نه WAIT/صبر)
+    # این باعث کاهش پیام‌ها از 30 به 2-3 تا می‌شود → رفع rate limit
     for r in sorted_results:
+        if r.signal not in (Signal.BUY, Signal.SELL):
+            continue  # صبر را ارسال نکن
         text = format_coin_message(r, run_meta)
         ok, ids = notifier.send_message(text)
         if ok and ids:

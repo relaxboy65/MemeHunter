@@ -279,12 +279,12 @@ def log_run_summary(extra_stats: Optional[Dict[str, Any]] = None) -> None:
     # بلوک خوانا برای چشم انسان در Actions
     buy = extra_stats.get("buy_count", 0) if extra_stats else 0
     sell = extra_stats.get("sell_count", 0) if extra_stats else 0
-    hold = extra_stats.get("hold_count", 0) if extra_stats else 0
+    wait = extra_stats.get("wait_count", 0) if extra_stats else 0
     total = extra_stats.get("total_coins", len(_run_stats["coins"])) if extra_stats else len(_run_stats["coins"])
     duration = extra_stats.get("duration_seconds") if extra_stats else None
     lines = [
         "========== RUN_REPORT ==========",
-        f"version={summary.get('version')}  total={total}  BUY={buy} SELL={sell} HOLD={hold}",
+        f"version={summary.get('version')}  total={total}  BUY={buy} SELL={sell} WAIT={wait}",
         f"real_data={_run_stats['coins_real_data']}  proxy_only={_run_stats['coins_proxy_only']}  errors={len(_run_stats['errors'])}",
     ]
     if duration is not None:
@@ -314,8 +314,8 @@ def log_run_summary(extra_stats: Optional[Dict[str, Any]] = None) -> None:
         logger.info("%s", line)
 
     logger.info("=" * 72)
-    logger.info("MH_RUN_END version=%s total=%s buy=%s sell=%s hold=%s",
-                summary.get("version"), total, buy, sell, hold)
+    logger.info("MH_RUN_END version=%s total=%s buy=%s sell=%s wait=%s",
+                summary.get("version"), total, buy, sell, wait)
     logger.info("=" * 72)
 
     # GitHub Step Summary (در Actions در UI بالای job دیده می‌شود)
@@ -329,7 +329,7 @@ def write_github_step_summary(summary: Dict[str, Any], extra: Dict[str, Any]) ->
     try:
         buy = extra.get("buy_count", 0)
         sell = extra.get("sell_count", 0)
-        hold = extra.get("hold_count", 0)
+        wait = extra.get("wait_count", 0)
         total = extra.get("total_coins", len(_run_stats["coins"]))
         duration = extra.get("duration_seconds")
         md: List[str] = []
@@ -340,7 +340,7 @@ def write_github_step_summary(summary: Dict[str, Any], extra: Dict[str, Any]) ->
         md.append(f"| کل کوین | **{total}** |")
         md.append(f"| 🟢 BUY | {buy} |")
         md.append(f"| 🔴 SELL | {sell} |")
-        md.append(f"| 🟡 HOLD | {hold} |")
+        md.append(f"| 🟡 WAIT | {wait} |")
         md.append(f"| داده واقعی | {_run_stats['coins_real_data']} |")
         md.append(f"| فقط پروکسی | {_run_stats['coins_proxy_only']} |")
         md.append(f"| خطاها | {len(_run_stats['errors'])} |")

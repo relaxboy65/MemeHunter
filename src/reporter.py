@@ -19,7 +19,7 @@ from .config import settings
 SIGNAL_EMOJI = {
     Signal.BUY: "BUY",
     Signal.SELL: "SELL",
-    Signal.WAIT: "HOLD",
+    Signal.WAIT: "WAIT",
 }
 
 
@@ -53,7 +53,7 @@ def format_table(results: List[AnalysisResult]) -> str:
 
     lines.append("")
     lines.append("=" * 60)
-    lines.append(f"  خلاصه: {buy_count} خرید | {sell_count} فروش | {wait_count} نگه‌داری")
+    lines.append(f"  خلاصه: {buy_count} خرید | {sell_count} فروش | {wait_count} صبر")
     lines.append("=" * 60)
     return "\n".join(lines)
 

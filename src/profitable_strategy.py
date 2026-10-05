@@ -32,7 +32,7 @@ logger = logging.getLogger(settings.PROJECT_SLUG)
 class Signal(str, Enum):
     BUY = "خرید"
     SELL = "فروش"
-    HOLD = "نگه‌داری"
+    WAIT = "صبر"
 
 
 @dataclass

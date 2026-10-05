@@ -59,7 +59,7 @@ class TestBacktestConfidenceInterval(unittest.TestCase):
                 price_after,
                 1100000, 110000, 3.0, 5.0,
                 55.0, 0.0005, 108, 105, True,
-                1.5, 8.0, 0.5, "نگه‌داری", 0.1,
+                1.5, 8.0, 0.5, "صبر", 0.1,
                 1.5, 12.0, 0.5, False,
                 0.6, False, 0.3, 0.1, False, "none",
                 0.6, 0.4, False, 0, 0, 0, 0.5, 1, "1 پروکسی",

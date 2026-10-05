@@ -27,7 +27,7 @@ def test_pump_score_has_multiple_confirmations_before_buy():
     signal = predict_pump(prices, volumes, current_price=100.5)
     # The fixture does not create a valid volume buildup under the 3-bar/7-bar definition.
     assert signal.confirmations >= 0
-    assert signal.action in {"WAIT", "BUY", "HOLD", "SELL"}
+    assert signal.action in {"WAIT", "BUY", "SELL"}
 
 
 def test_watch_threshold_is_below_trade_threshold():

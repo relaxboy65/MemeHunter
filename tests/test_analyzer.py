@@ -103,7 +103,7 @@ class TestAnalyzeCoin(unittest.TestCase):
         )
         coin = self._make_coin()
         result = analyze_coin(coin, pack)
-        self.assertEqual(result.signal, Signal.WAIT, f"باید HOLD باشد ولی {result.signal} است")
+        self.assertEqual(result.signal, Signal.WAIT, f"باید WAIT باشد ولی {result.signal} است")
 
     def test_reasons_not_empty(self):
         """دلایل سیگنال نباید خالی باشند."""

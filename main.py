@@ -402,7 +402,7 @@ def run_scan(limit: int = 50, advanced: bool = False,
             result = analyze_coin(coin, indicators, advanced_pack=advanced_pack)
 
             # V2.6.0 - Pump Predictor اکنون سیگنال اصلی است (نه analyzer)
-            # فقط BUY / SELL / WAIT (بدون HOLD)
+            # فقط BUY / SELL / WAIT
             if settings.ENABLE_PUMP_HUNTER:
                 # دریافت داده‌های اضافی برای predict_pump از IndicatorPack
                 volume_surge = indicators.volume_surge_ratio
@@ -739,59 +739,8 @@ def main() -> int:
         })
         return 1
 
-    # V2.6.0 - Position Tracker: بررسی پوزیشن‌های باز + بستن با SELL/SL/TP
-    current_prices = {r.symbol: r.current_price for r in results}
-    sell_signals = {r.symbol: r for r in results if r.signal == Signal.SELL}
-
-    # بررسی پوزیشن‌های باز
-    closed_tracked = check_tracked_positions(current_prices, sell_signals)
-    if closed_tracked:
-        print(f"\n{'='*60}")
-        print(f"  📊 {len(closed_tracked)} پوزیشن بسته شد")
-        print(f"{'='*60}")
-        notifier = TelegramNotifier()
-        for pos in closed_tracked:
-            reply_text = format_close_reply(pos)
-            print(reply_text)
-            print()
-            # ارسال ریپلای تلگرام به پیام BUY اصلی
-            if args.telegram and pos.telegram_message_id:
-                try:
-                    notifier.send_reply(pos.telegram_message_id, reply_text)
-                    logger.info("Reply sent to message %s for %s", pos.telegram_message_id, pos.symbol)
-                except Exception as exc:
-                    logger.warning("Reply failed: %s", exc)
-
-    # ثبت پوزیشن‌های BUY جدید
-    for r in results:
-        if r.signal == Signal.BUY:
-            tg_id = getattr(r, 'telegram_message_id', '') or ''
-            pump_score = r.pump.get('pump_score', r.score) if hasattr(r, 'pump') and r.pump else r.score
-            open_tracked_position(
-                symbol=r.symbol,
-                name=r.name,
-                entry_price=r.current_price,
-                pump_score=pump_score,
-                telegram_message_id=str(tg_id) if tg_id else '',
-                stop_loss_pct=0.08,
-                take_profit_pct=0.30,
-            )
-            logger.info("Tracked position opened: %s @ $%.6f", r.symbol, r.current_price)
-
-    # V1.3.0 - بررسی پوزیشن‌های paper trading باز (حفظ شده برای compatibility)
-    if settings.ENABLE_PAPER_TRADING:
-        closed_positions = check_open_positions(current_prices)
-        if closed_positions:
-            print(f"\n✓ {len(closed_positions)} پوزیشن paper trading بسته شد:")
-            for pos in closed_positions:
-                print(f"  {pos.symbol} {pos.status} PnL: {pos.pnl_pct:+.2f}% ({pos.close_reason})")
-
-        # باز کردن پوزیشن جدید برای سیگنال‌های خرید
-        for r in results:
-            if r.signal == Signal.BUY and r.confidence > settings.ADVANCED_MIN_CONFIDENCE:
-                open_position(r.symbol, r.name, r.current_price, r.score)
-
-    # --- تلگرام اول (تا message_id روی results ست شود) سپس ذخیره در DB ---
+    # V2.8.0 - تلگرام اول (تا message_id روی results ست شود)
+    # فقط BUY/SELL ارسال می‌شود → 2-3 پیام به‌جای 30
     paper_stats = None
     if settings.ENABLE_PAPER_TRADING:
         paper_stats = get_paper_trading_stats()
@@ -826,17 +775,63 @@ def main() -> int:
             results, paper_trading_stats=paper_stats, run_meta=run_meta
         )
         if ok:
-            print(f"\n✓ پیام‌های تلگرام ارسال شد — تعداد: {len(msg_ids)} (هر ارز یک پیام جدا)")
-            print(f"  message_idها: {msg_ids}")
-            print("  هر message_id در ستون telegram_message_id فایل coins_database.csv ذخیره می‌شود.")
+            buy_sell = sum(1 for r in results if r.signal in (Signal.BUY, Signal.SELL))
+            print(f"\n✓ پیام‌های تلگرام ارسال شد — تعداد: {len(msg_ids)} (فقط BUY/SELL)")
         else:
             notifier = TelegramNotifier()
             if not notifier.is_configured:
-                print("\n✗ تلگرام پیکربندی نشده. تنظیم کنید:")
-                print("  export TELEGRAM_BOT_TOKEN='...'")
-                print("  export TELEGRAM_CHAT_ID='...'")
+                print("\n✗ تلگرام پیکربندی نشده.")
             else:
                 print("\n✗ ارسال تلگرام ناموفق بود.")
+
+    # V2.8.0 - Position Tracker: بعد از تلگرام (تا message_id موجود باشد)
+    current_prices = {r.symbol: r.current_price for r in results}
+    sell_signals = {r.symbol: r for r in results if r.signal == Signal.SELL}
+
+    # بررسی پوزیشن‌های باز
+    closed_tracked = check_tracked_positions(current_prices, sell_signals)
+    if closed_tracked:
+        print(f"\n{'='*60}")
+        print(f"  📊 {len(closed_tracked)} پوزیشن بسته شد")
+        print(f"{'='*60}")
+        notifier = TelegramNotifier()
+        for pos in closed_tracked:
+            reply_text = format_close_reply(pos)
+            print(reply_text)
+            print()
+            # ارسال ریپلای تلگرام به پیام BUY اصلی
+            if args.telegram and pos.telegram_message_id:
+                try:
+                    notifier.send_reply(pos.telegram_message_id, reply_text)
+                    logger.info("Reply sent to message %s for %s", pos.telegram_message_id, pos.symbol)
+                except Exception as exc:
+                    logger.warning("Reply failed: %s", exc)
+
+    # ثبت پوزیشن‌های BUY جدید - حالا message_id موجود است
+    for r in results:
+        if r.signal == Signal.BUY:
+            tg_id = str(r.telegram_message_id) if getattr(r, 'telegram_message_id', None) else ''
+            pump_score = r.pump.get('pump_score', r.score) if hasattr(r, 'pump') and r.pump else r.score
+            open_tracked_position(
+                symbol=r.symbol,
+                name=r.name,
+                entry_price=r.current_price,
+                pump_score=pump_score,
+                telegram_message_id=tg_id,
+                stop_loss_pct=0.08,
+                take_profit_pct=0.30,
+            )
+            logger.info("Tracked position opened: %s @ $%.6f (msg_id=%s)", r.symbol, r.current_price, tg_id)
+
+    # V1.3.0 - Paper Trading (compatibility)
+    if settings.ENABLE_PAPER_TRADING:
+        closed_positions = check_open_positions(current_prices)
+        if closed_positions:
+            for pos in closed_positions:
+                print(f"  {pos.symbol} {pos.status} PnL: {pos.pnl_pct:+.2f}% ({pos.close_reason})")
+        for r in results:
+            if r.signal == Signal.BUY and r.confidence > settings.ADVANCED_MIN_CONFIDENCE:
+                open_position(r.symbol, r.name, r.current_price, r.score)
 
     # ذخیره در دیتابیس CSV (data/coins_database.csv) — شامل telegram_message_id
     saved_count = save_results_to_db(results)

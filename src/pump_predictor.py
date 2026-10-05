@@ -51,7 +51,7 @@ class PumpSignal:
     pump_score: float = 0.0          # 0..1 - احتمال پامپ
     distribution_score: float = 0.0  # 0..1 - احتمال توزیع
     # توصیه
-    action: str = "WAIT"             # BUY / HOLD / SELL / WAIT / NO_TRADE
+    action: str = "WAIT"             # BUY / SELL / WAIT
     confirmations: int = 0
     risk_gate: str = "UNKNOWN"
     signal_tier: str = "IGNORE"
@@ -373,7 +373,7 @@ def predict_pump(prices: List[float],
 
     ترکیب همه نشانه‌ها برای تشخیص:
     1. آیا ارز در حال انباشت است؟ (pre-pump → BUY)
-    2. آیا ارز در حال پامپ است؟ (pumping → HOLD)
+    2. آیا ارز در حال پامپ است؟ (pumping → WAIT)
     3. آیا ارز در حال توزیع است؟ (post-pump → SELL)
     4. یا خواب است؟ (dormant → WAIT)
     """
