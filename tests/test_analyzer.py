@@ -93,7 +93,7 @@ class TestAnalyzeCoin(unittest.TestCase):
         self.assertLessEqual(result.score, 0.35)
 
     def test_hold_signal(self):
-        """بسته اندیکاتورهای خنثی باید سیگنال نگه‌داری بدهد."""
+        """بسته اندیکاتورهای خنثی باید سیگنال صبر بدهد."""
         pack = IndicatorPack(
             rsi=50.0,
             macd=MACDResult(macd_line=0.0001, signal_line=0.0001, histogram=0.0, bullish=False),
@@ -103,7 +103,7 @@ class TestAnalyzeCoin(unittest.TestCase):
         )
         coin = self._make_coin()
         result = analyze_coin(coin, pack)
-        self.assertEqual(result.signal, Signal.HOLD, f"باید HOLD باشد ولی {result.signal} است")
+        self.assertEqual(result.signal, Signal.WAIT, f"باید HOLD باشد ولی {result.signal} است")
 
     def test_reasons_not_empty(self):
         """دلایل سیگنال نباید خالی باشند."""

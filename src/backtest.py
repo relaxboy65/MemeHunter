@@ -27,7 +27,7 @@ class BacktestStats:
     total_signals: int = 0
     total_buy: int = 0
     total_sell: int = 0
-    total_hold: int = 0
+    total_wait: int = 0
     # برای سیگنال‌های BUY
     buy_win_rate_7d: float = 0.0       # درصد سودده بعد از 7 روز
     buy_win_rate_14d: float = 0.0      # درصد سودده بعد از 14 روز
@@ -147,7 +147,7 @@ def run_backtest(days_back: int = 30, hold_days: int = 7) -> BacktestStats:
     stats.total_signals = len(all_records)
     stats.total_buy = sum(1 for r in all_records if r.get("signal") == "خرید")
     stats.total_sell = sum(1 for r in all_records if r.get("signal") == "فروش")
-    stats.total_hold = sum(1 for r in all_records if r.get("signal") == "نگه‌داری")
+    stats.total_wait = sum(1 for r in all_records if r.get("signal") == "صبر")
 
     # ارزیابی سیگنال‌های BUY
     for record in all_records:
@@ -271,7 +271,7 @@ def format_backtest_report(stats: BacktestStats) -> str:
     lines.append(f"  کل سیگنال‌ها: {stats.total_signals}")
     lines.append(f"  سیگنال خرید: {stats.total_buy}")
     lines.append(f"  سیگنال فروش: {stats.total_sell}")
-    lines.append(f"  سیگنال نگه‌داری: {stats.total_hold}")
+    lines.append(f"  سیگنال صبر: {stats.total_wait}")
     lines.append("")
 
     if stats.total_buy > 0:

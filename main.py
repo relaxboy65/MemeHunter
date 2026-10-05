@@ -99,6 +99,12 @@ from src.paper_trading import (
     get_paper_trading_stats, format_paper_trading_report,
     get_open_positions,
 )
+# V2.6.0 - Position Tracker
+from src.position_tracker import (
+    open_tracked_position, check_tracked_positions,
+    get_open_tracked_positions, get_position_stats,
+    format_close_reply, format_stats_report,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -395,32 +401,64 @@ def run_scan(limit: int = 50, advanced: bool = False,
 
             result = analyze_coin(coin, indicators, advanced_pack=advanced_pack)
 
-            # V2.3 Pump Hunter: pre-pump engine is now part of the live scan.
-            pump_signal = predict_pump(
-                prices=prices, volumes=volumes, highs=highs, lows=lows,
-                closes=prices, current_price=current_price,
-                real_orderflow=real_orderflow, real_liquidity=real_liquidity,
-                funding_oi=funding_oi,
-            ) if settings.ENABLE_PUMP_HUNTER else None
+            # V2.6.0 - Pump Predictor اکنون سیگنال اصلی است (نه analyzer)
+            # فقط BUY / SELL / WAIT (بدون HOLD)
+            if settings.ENABLE_PUMP_HUNTER:
+                # دریافت داده‌های اضافی برای predict_pump
+                volume_surge = ind.get("volume_surge_ratio")
+                price_change_24h = coin.get("price_change_percentage_24h")
+                rsi_val = ind.get("rsi")
 
-            risk = assess_trade_risk(
-                market_cap=market_cap, volume_24h=coin.get("total_volume") or 0.0,
-                current_price=current_price, liquidity=real_liquidity,
-                pump_score=pump_signal.pump_score if pump_signal else 0.0,
-                distribution_score=pump_signal.distribution_score if pump_signal else 0.0,
-                atr_pct=(getattr(indicators.atr, "atr_percent", 0.0) if getattr(indicators, "atr", None) else 0.0),
-            )
+                pump_signal = predict_pump(
+                    prices=prices, volumes=volumes, highs=highs, lows=lows,
+                    closes=prices, current_price=current_price,
+                    real_orderflow=real_orderflow, real_liquidity=real_liquidity,
+                    funding_oi=funding_oi,
+                    volume_surge_ratio=volume_surge,
+                    price_change_24h_pct=price_change_24h,
+                    rsi=rsi_val,
+                )
 
-            if pump_signal is not None:
+                risk = assess_trade_risk(
+                    market_cap=market_cap, volume_24h=coin.get("total_volume") or 0.0,
+                    current_price=current_price, liquidity=real_liquidity,
+                    pump_score=pump_signal.pump_score,
+                    distribution_score=pump_signal.distribution_score,
+                    atr_pct=(getattr(indicators.atr, "atr_percent", 0.0) if getattr(indicators, "atr", None) else 0.0),
+                )
+
                 pump_signal.risk_gate = "PASS" if risk.tradeable else "BLOCK"
                 result.pump = pump_signal.to_dict()
                 result.risk = risk.to_dict()
-                if pump_signal.action == "BUY" and not risk.tradeable:
-                    pump_signal.action = "NO_TRADE"
-                    result.pump["action"] = "NO_TRADE"
-                    result.reasons.append("Pump Hunter: سیگنال قوی است ولی Risk Gate اجازه ورود نمی‌دهد")
+
+                # V2.6.0: سیگنال اصلی از pump_predictor می‌آید
+                if not risk.tradeable and pump_signal.action == "BUY":
+                    pump_signal.action = "WAIT"
+                    result.pump["action"] = "WAIT"
+                    result.reasons.append("⚠️ Risk Gate: ریسک بالا، خرید مسدود شد")
+
+                # تبدیل action pump به Signal enum
                 if pump_signal.action == "BUY":
-                    result.reasons.insert(0, f"Pump Hunter: score={pump_signal.pump_score:.2f}, confirmations={pump_signal.confirmations}")
+                    result.signal = Signal.BUY
+                    result.score = pump_signal.pump_score
+                    result.reasons.insert(0, f"🚀 Pump Hunter: score={pump_signal.pump_score:.2f}, conf={pump_signal.confirmations}")
+                elif pump_signal.action == "SELL":
+                    result.signal = Signal.SELL
+                    result.score = 1.0 - pump_signal.distribution_score
+                    result.reasons.insert(0, f"🔴 Distribution: score={pump_signal.distribution_score:.2f}")
+                else:
+                    # WAIT - شامل در حال پامپ
+                    result.signal = Signal.WAIT
+                    if pump_signal.phase.value == "در حال پامپ":
+                        result.reasons.insert(0, "⚠️ در حال پامپ - خرید دیر است")
+            else:
+                pump_signal = None
+                risk = assess_trade_risk(
+                    market_cap=market_cap, volume_24h=coin.get("total_volume") or 0.0,
+                    current_price=current_price, liquidity=real_liquidity,
+                    pump_score=0.0, distribution_score=0.0,
+                    atr_pct=(getattr(indicators.atr, "atr_percent", 0.0) if getattr(indicators, "atr", None) else 0.0),
+                )
 
             results.append(result)
 
@@ -469,7 +507,7 @@ def run_scan(limit: int = 50, advanced: bool = False,
         "total_coins": len(results),
         "buy_count": sum(1 for r in results if r.signal == Signal.BUY),
         "sell_count": sum(1 for r in results if r.signal == Signal.SELL),
-        "hold_count": sum(1 for r in results if r.signal == Signal.HOLD),
+        "wait_count": sum(1 for r in results if r.signal == Signal.WAIT),
         "kucoin_available": kucoin_available_count,
         "binance_available": binance_available_count,
         "history_kucoin": history_from_kucoin,
@@ -697,13 +735,51 @@ def main() -> int:
             "total_coins": 0,
             "buy_count": 0,
             "sell_count": 0,
-            "hold_count": 0,
+            "wait_count": 0,
         })
         return 1
 
-    # V1.3.0 - بررسی پوزیشن‌های paper trading باز
+    # V2.6.0 - Position Tracker: بررسی پوزیشن‌های باز + بستن با SELL/SL/TP
+    current_prices = {r.symbol: r.current_price for r in results}
+    sell_signals = {r.symbol: r for r in results if r.signal == Signal.SELL}
+
+    # بررسی پوزیشن‌های باز
+    closed_tracked = check_tracked_positions(current_prices, sell_signals)
+    if closed_tracked:
+        print(f"\n{'='*60}")
+        print(f"  📊 {len(closed_tracked)} پوزیشن بسته شد")
+        print(f"{'='*60}")
+        notifier = TelegramNotifier()
+        for pos in closed_tracked:
+            reply_text = format_close_reply(pos)
+            print(reply_text)
+            print()
+            # ارسال ریپلای تلگرام به پیام BUY اصلی
+            if args.telegram and pos.telegram_message_id:
+                try:
+                    notifier.send_reply(pos.telegram_message_id, reply_text)
+                    logger.info("Reply sent to message %s for %s", pos.telegram_message_id, pos.symbol)
+                except Exception as exc:
+                    logger.warning("Reply failed: %s", exc)
+
+    # ثبت پوزیشن‌های BUY جدید
+    for r in results:
+        if r.signal == Signal.BUY:
+            tg_id = getattr(r, 'telegram_message_id', '') or ''
+            pump_score = r.pump.get('pump_score', r.score) if hasattr(r, 'pump') and r.pump else r.score
+            open_tracked_position(
+                symbol=r.symbol,
+                name=r.name,
+                entry_price=r.current_price,
+                pump_score=pump_score,
+                telegram_message_id=str(tg_id) if tg_id else '',
+                stop_loss_pct=0.08,
+                take_profit_pct=0.30,
+            )
+            logger.info("Tracked position opened: %s @ $%.6f", r.symbol, r.current_price)
+
+    # V1.3.0 - بررسی پوزیشن‌های paper trading باز (حفظ شده برای compatibility)
     if settings.ENABLE_PAPER_TRADING:
-        current_prices = {r.symbol: r.current_price for r in results}
         closed_positions = check_open_positions(current_prices)
         if closed_positions:
             print(f"\n✓ {len(closed_positions)} پوزیشن paper trading بسته شد:")
@@ -873,7 +949,7 @@ def main() -> int:
         "total_coins": len(results) if results else 0,
         "buy_count": sum(1 for r in results if r.signal == Signal.BUY),
         "sell_count": sum(1 for r in results if r.signal == Signal.SELL),
-        "hold_count": sum(1 for r in results if r.signal == Signal.HOLD),
+        "wait_count": sum(1 for r in results if r.signal == Signal.WAIT),
     })
     return 0
 

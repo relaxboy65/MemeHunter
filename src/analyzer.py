@@ -1,6 +1,6 @@
 """
 analyzer.py
-ترکیب اندیکاتورها و صدور سیگنال خرید/فروش/نگه‌داری.
+ترکیب اندیکاتورها و صدور سیگنال خرید/فروش/صبر.
 Combines indicators into a Buy/Sell/Hold signal with score.
 
 V1.2.0 - نرمال‌سازی MACD با ATR + تأثیر صریح ATR و Bollinger روی امتیاز.
@@ -23,7 +23,7 @@ logger = logging.getLogger(settings.PROJECT_SLUG)
 class Signal(str, Enum):
     BUY = "خرید"
     SELL = "فروش"
-    HOLD = "نگه‌داری"
+    WAIT = "صبر"   # V2.6.0: HOLD → WAIT
 
 
 # --------------------------------------------------------------------------- #
@@ -333,7 +333,7 @@ def analyze_coin(coin: dict, indicators: IndicatorPack,
     elif score <= settings.SELL_THRESHOLD:
         signal = Signal.SELL
     else:
-        signal = Signal.HOLD
+        signal = Signal.WAIT  # V2.6.0: HOLD → WAIT
 
     # میزان اطمینان
     confidence = abs(score - 0.5) * 2

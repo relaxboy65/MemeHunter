@@ -263,7 +263,7 @@ def analyze_profitable(coin: dict, indicators: IndicatorPack,
     elif score <= 0.40:
         signal = Signal.SELL
     else:
-        signal = Signal.HOLD
+        signal = Signal.WAIT
 
     # اطمینان بر اساس تعداد شواهد مثبت
     confidence = min(0.95, 0.3 + (positive_evidence / max(1, evidence_count)) * 0.7)

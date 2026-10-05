@@ -25,7 +25,7 @@ def format_html(results: List[AnalysisResult],
 
     buy_count = sum(1 for r in results if r.signal == Signal.BUY)
     sell_count = sum(1 for r in results if r.signal == Signal.SELL)
-    hold_count = sum(1 for r in results if r.signal == Signal.HOLD)
+    wait_count = sum(1 for r in results if r.signal == Signal.WAIT)
     real_count = sum(1 for r in results if "واقعی" in (r.data_sources or ""))
     proxy_count = sum(1 for r in results if "پروکسی" in (r.data_sources or ""))
 
@@ -162,7 +162,7 @@ def format_html(results: List[AnalysisResult],
         .coin-card:hover {{ transform: translateY(-3px); }}
         .coin-card.خرید {{ border-left-color: #00ff88; }}
         .coin-card.فروش {{ border-left-color: #ff4757; }}
-        .coin-card.نگه‌داری {{ border-left-color: #ffa502; }}
+        .coin-card.صبر {{ border-left-color: #ffa502; }}
         .coin-card .header {{
             display: flex;
             justify-content: space-between;
@@ -179,7 +179,7 @@ def format_html(results: List[AnalysisResult],
         }}
         .signal-badge.خرید {{ background: rgba(0, 255, 136, 0.2); color: #00ff88; }}
         .signal-badge.فروش {{ background: rgba(255, 71, 87, 0.2); color: #ff4757; }}
-        .signal-badge.نگه‌داری {{ background: rgba(255, 165, 2, 0.2); color: #ffa502; }}
+        .signal-badge.صبر {{ background: rgba(255, 165, 2, 0.2); color: #ffa502; }}
         .coin-card .price {{ font-size: 1.5em; margin: 10px 0; }}
         .coin-card .changes {{ color: #aaa; margin-bottom: 15px; }}
         .coin-card .changes .up {{ color: #00ff88; }}
@@ -269,8 +269,8 @@ def format_html(results: List[AnalysisResult],
                 <div class="label">🔴 فروش</div>
             </div>
             <div class="stat-card stat-hold">
-                <div class="value">{hold_count}</div>
-                <div class="label">🟡 نگه‌داری</div>
+                <div class="value">{wait_count}</div>
+                <div class="label">🟡 صبر</div>
             </div>
             <div class="stat-card stat-total">
                 <div class="value">{len(results)}</div>

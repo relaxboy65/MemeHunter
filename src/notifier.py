@@ -28,7 +28,7 @@ logger = logging.getLogger(settings.PROJECT_SLUG)
 SIGNAL_BADGE = {
     Signal.BUY: "🟢 BUY",
     Signal.SELL: "🔴 SELL",
-    Signal.HOLD: "🟡 HOLD",
+    Signal.WAIT: "🟡 HOLD",
 }
 
 
@@ -115,7 +115,7 @@ def format_summary_message(
     """پیام خلاصه کوتاه قبل از پیام‌های تک‌ارز."""
     buys = sum(1 for r in results if r.signal == Signal.BUY)
     sells = sum(1 for r in results if r.signal == Signal.SELL)
-    holds = sum(1 for r in results if r.signal == Signal.HOLD)
+    waits = sum(1 for r in results if r.signal == Signal.WAIT)
     real_count = sum(
         1 for r in results if r.data_sources and "واقعی" in (r.data_sources or "")
     )
@@ -211,6 +211,23 @@ class TelegramNotifier:
             return False, []
         self.last_message_ids = [mid]
         return True, [mid]
+
+    # V2.6.0 - ارسال ریپلای به پیام اصلی
+    def send_reply(self, original_message_id: str, text: str) -> bool:
+        """ارسال ریپلای به پیام BUY اصلی با نتیجه ترید."""
+        if not self.is_configured:
+            logger.warning("Telegram not configured, skip reply")
+            return False
+        try:
+            msg_id = int(original_message_id)
+        except (ValueError, TypeError):
+            logger.warning("Invalid message_id for reply: %s", original_message_id)
+            return False
+        result = self._send_single(text, reply_to_message_id=msg_id)
+        if result:
+            logger.info("Reply sent to message %s", msg_id)
+            return True
+        return False
 
     def _send_single(
         self,
