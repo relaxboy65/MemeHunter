@@ -404,10 +404,10 @@ def run_scan(limit: int = 50, advanced: bool = False,
             # V2.6.0 - Pump Predictor اکنون سیگنال اصلی است (نه analyzer)
             # فقط BUY / SELL / WAIT (بدون HOLD)
             if settings.ENABLE_PUMP_HUNTER:
-                # دریافت داده‌های اضافی برای predict_pump
-                volume_surge = ind.get("volume_surge_ratio")
+                # دریافت داده‌های اضافی برای predict_pump از IndicatorPack
+                volume_surge = indicators.volume_surge_ratio
                 price_change_24h = coin.get("price_change_percentage_24h")
-                rsi_val = ind.get("rsi")
+                rsi_val = indicators.rsi
 
                 pump_signal = predict_pump(
                     prices=prices, volumes=volumes, highs=highs, lows=lows,

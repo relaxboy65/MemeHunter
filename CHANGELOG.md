@@ -12,6 +12,27 @@
 
 ---
 
+## [V2.6.1] - 2026-10-05 - Patch (رفع باگ NameError)
+
+### 🐛 رفع باگ بحرانی
+- **مشکل**: `NameError: name 'ind' is not defined` در خط 408 main.py
+- **علت**: متغیر `ind` به‌جای `indicators` استفاده شده بود
+- **راه‌حل**: استفاده از `indicators.volume_surge_ratio` و `indicators.rsi` (از IndicatorPack)
+
+### 📝 جزئیات
+در V2.6.0، ادغام pump_predictor در main.py این باگ را ایجاد کرد:
+```python
+# اشتباه:
+volume_surge = ind.get("volume_surge_ratio")
+rsi_val = ind.get("rsi")
+
+# اصلاح:
+volume_surge = indicators.volume_surge_ratio
+rsi_val = indicators.rsi
+```
+
+---
+
 ## [V2.6.0] - 2026-10-05 - Minor (اصلاح 5 باگ جدی)
 
 > 🎯 حل 5 مشکلی که در لاگ‌های واقعی پیدا شد
