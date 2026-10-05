@@ -362,9 +362,14 @@ def predict_pump(prices: List[float],
                   real_orderflow: Optional[Any] = None,
                   real_liquidity: Optional[Any] = None,
                   funding_oi: Optional[Any] = None,
-                  current_price: float = 0) -> PumpSignal:
+                  current_price: float = 0,
+                  volume_surge_ratio: Optional[float] = None,
+                  price_change_24h_pct: Optional[float] = None,
+                  rsi: Optional[float] = None) -> PumpSignal:
     """
     پیش‌بینی پامپ - تابع اصلی.
+
+    V2.4.0: اکنون از indicators موجود (volume_surge_ratio, price_change_24h, rsi) هم استفاده می‌کند.
 
     ترکیب همه نشانه‌ها برای تشخیص:
     1. آیا ارز در حال انباشت است؟ (pre-pump → BUY)
@@ -493,6 +498,14 @@ def predict_pump(prices: List[float],
     else:
         vol_ratio = 1
 
+    # V2.4.0: استفاده از volume_surge_ratio و price_change_24h اگر موجودند
+    if volume_surge_ratio is not None:
+        # volume_surge_ratio از CSV: نسبت حجم امروز به میانگین
+        vol_ratio = max(vol_ratio, volume_surge_ratio)
+    if price_change_24h_pct is not None:
+        # price_change_24h_pct از CSV: تغییر قیمت 24 ساعت
+        recent_return = max(recent_return, price_change_24h_pct)
+
     # Distribution score
     distribution_score = 0.0
     if recent_return > 20 and vol_ratio > 2:
@@ -505,6 +518,20 @@ def predict_pump(prices: List[float],
         signal.signals.append(
             f"خستگی بازار: رشد {recent_return:.1f}% + حجم {vol_ratio:.1f}x"
         )
+
+    # V2.4.0: RSI-based signals (اگر RSI موجود است)
+    if rsi is not None:
+        if rsi > 75:
+            # RSI بسیار بالا = اشباع خرید شدید = احتمال فروش
+            distribution_score = min(1.0, distribution_score + 0.2)
+            signal.signals.append(f"RSI={rsi:.0f} - اشباع خرید شدید (احتمال برگشت)")
+        elif rsi < 30:
+            # RSI بسیار پایین = اشباع فروش = احتمال برگشت صعودی
+            pump_score = min(1.0, pump_score + 0.15)
+            signal.signals.append(f"RSI={rsi:.0f} - اشباع فروش (احتمال برگشت صعودی)")
+        elif 40 <= rsi <= 60:
+            # RSI خنثی = بازار در حالت تعادل
+            pass
 
     # اگر funding rate خیلی مثبت = long squeeze risk
     if funding_oi and funding_oi.funding_rate > 0.10:
@@ -527,43 +554,47 @@ def predict_pump(prices: List[float],
     else:
         signal.signal_tier = "IGNORE"
 
-    # ===== تصمیم‌گیری =====
-    if signal.distribution_score >= 0.6:
-        # توزیع قوی → SELL
+    # ===== تصمیم‌گیری - V2.5.0: فقط BUY/SELL/WAIT (بدون HOLD) =====
+    # BUY: قبل از پامپ (در حال انباشت)
+    # SELL: بعد از پامپ (در حال توزیع)
+    # WAIT: در غیر این صورت (شامل در حال پامپ - چون دیر است)
+    #       در حال پامپ دیگر نمی‌گوییم HOLD چون دیر شده برای خرید
+
+    if signal.distribution_score >= 0.5:
+        # توزیع قوی → SELL (بعد از پامپ)
         signal.phase = PumpPhase.DISTRIBUTING
         signal.action = "SELL"
         signal.confidence = signal.distribution_score
-        signal.expected_move_pct = -15  # انتظار نزول 15%
-    elif signal.distribution_score >= 0.4 and recent_return > 15:
+        signal.expected_move_pct = -15
+    elif signal.distribution_score >= 0.3 and recent_return > 10:
         # خستگی بازار → SELL
         signal.phase = PumpPhase.EXHAUSTED
         signal.action = "SELL"
         signal.confidence = signal.distribution_score
         signal.expected_move_pct = -10
-    elif signal.pump_score >= settings.PUMP_MIN_SCORE and signal.confirmations >= settings.PUMP_MIN_CONFIRMATIONS:
-        # انباشت قوی → BUY
+    elif recent_return > 10 and signal.distribution_score < 0.3:
+        # در حال پامپ → WAIT (دیر شده، نخر)
+        signal.phase = PumpPhase.PUMPING
+        signal.action = "WAIT"
+        signal.confidence = 0.7
+        signal.expected_move_pct = recent_return / 2
+        signal.signals.append("⚠️ در حال پامپ است - خرید دیر است، صبر کن تا تمام شود")
+    elif signal.pump_score >= 0.45 and signal.confirmations >= 1:
+        # انباشت قابل توجه با حداقل 1 تأیید → BUY (قبل از پامپ)
         signal.phase = PumpPhase.READY_TO_PUMP
         signal.action = "BUY"
         signal.confidence = signal.pump_score
-        signal.expected_move_pct = 25  # انتظار رشد 25%
-        signal.time_to_pump_hours = 24 if signal.pump_score >= 0.7 else 48
-        # Entry zone: قیمت فعلی ± 2%
+        signal.expected_move_pct = 20
+        signal.time_to_pump_hours = 24
         signal.entry_zone = (current_price * 0.98, current_price * 1.02)
         signal.stop_loss_pct = 0.08
         signal.take_profit_pct = 0.30
-    elif signal.pump_score >= settings.PUMP_WATCH_MIN_SCORE and signal.confirmations >= settings.PUMP_CANDIDATE_MIN_CONFIRMATIONS:
-        # Discovery signal: one confirmation is enough for CANDIDATE/WATCH, never for BUY.
+    elif signal.pump_score >= 0.35:
+        # انباشت اولیه → WATCH
         signal.phase = PumpPhase.ACCUMULATION
         signal.action = "WAIT"
-        signal.confidence = signal.pump_score * 0.7
-        signal.expected_move_pct = 15
-        signal.entry_zone = (current_price * 0.97, current_price * 1.03)
-    elif recent_return > 10:
-        # در حال پامپ → HOLD
-        signal.phase = PumpPhase.PUMPING
-        signal.action = "HOLD"
-        signal.confidence = 0.6
-        signal.expected_move_pct = recent_return / 2  # ادامه احتمالی
+        signal.confidence = signal.pump_score * 0.6
+        signal.expected_move_pct = 10
     else:
         # خواب → WAIT
         signal.phase = PumpPhase.DORMANT

@@ -65,6 +65,13 @@ from .sentiment import get_sentiment, SentimentResult
 from .portfolio import analyze_portfolio, PortfolioResult
 # V2.2.0 - Pump Prediction
 from .pump_predictor import predict_pump, format_pump_signal, PumpSignal, PumpPhase
+from .meme_discovery import MemeDiscovery
+from .position_tracker import (
+    open_tracked_position, check_tracked_positions,
+    get_open_tracked_positions, get_closed_tracked_positions,
+    get_position_stats, format_close_reply, format_stats_report,
+    TrackedPosition,
+)
 
 __all__ = [
     # config
