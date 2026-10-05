@@ -473,13 +473,31 @@ def predict_pump(prices: List[float],
         weighted_score += spring["spring_score"] * 0.10
         available_weight += 0.10
 
-    pump_score = weighted_score / available_weight if available_weight else 0.0
+    # V2.7.0 - نرمال‌سازی ساده‌تر و کارآمدتر
+    # به‌جای تقسیم بر available_weight، مجموع وزن‌های کامل را استفاده می‌کنیم
+    # این باعث می‌شود حتی با 1 نشانه، score معقول باشد
+    total_possible_weight = 0.30 + 0.20 + 0.25 + 0.15 + 0.10  # = 1.0
+    pump_score = weighted_score / total_possible_weight if total_possible_weight > 0 else 0.0
+
+    # V2.7.0: boost اگر چند نشانه همزمان فعال باشند (confluence)
+    active_count = sum([
+        bool(buildup and buildup["buildup_score"] >= 0.5),
+        bool(squeeze and squeeze["squeeze_score"] >= 0.5),
+        bool(smart_money and smart_money["smart_money_score"] >= 0.4),
+        bool(short_squeeze and short_squeeze["short_squeeze_score"] >= 0.3),
+        bool(spring and spring["is_spring"]),
+    ])
+    if active_count >= 2:
+        pump_score = min(1.0, pump_score * 1.3)  # 30% boost for confluence
+    if active_count >= 3:
+        pump_score = min(1.0, pump_score * 1.2)  # additional 20% boost
+
     signal.pump_score = min(1.0, pump_score)
     signal.confirmations = sum([
-        bool(buildup and buildup["buildup_score"] >= 0.7),
-        bool(squeeze and squeeze["squeeze_score"] >= 0.7),
-        bool(smart_money and smart_money["is_smart_money_buying"]),
-        bool(short_squeeze and short_squeeze["is_short_squeeze_setup"]),
+        bool(buildup and buildup["buildup_score"] >= 0.5),
+        bool(squeeze and squeeze["squeeze_score"] >= 0.5),
+        bool(smart_money and smart_money["smart_money_score"] >= 0.4),
+        bool(short_squeeze and short_squeeze["short_squeeze_score"] >= 0.3),
         bool(spring and spring["is_spring"]),
     ])
 
@@ -579,8 +597,9 @@ def predict_pump(prices: List[float],
         signal.confidence = 0.7
         signal.expected_move_pct = recent_return / 2
         signal.signals.append("⚠️ در حال پامپ است - خرید دیر است، صبر کن تا تمام شود")
-    elif signal.pump_score >= 0.45 and signal.confirmations >= 1:
+    elif signal.pump_score >= 0.20 and signal.confirmations >= 1:
         # انباشت قابل توجه با حداقل 1 تأیید → BUY (قبل از پامپ)
+        # V2.7.0: آستانه 0.20 چون با نرمال‌سازی جدید، یک نشانه قوی ≈ 0.20-0.25
         signal.phase = PumpPhase.READY_TO_PUMP
         signal.action = "BUY"
         signal.confidence = signal.pump_score
@@ -589,7 +608,7 @@ def predict_pump(prices: List[float],
         signal.entry_zone = (current_price * 0.98, current_price * 1.02)
         signal.stop_loss_pct = 0.08
         signal.take_profit_pct = 0.30
-    elif signal.pump_score >= 0.35:
+    elif signal.pump_score >= 0.10:
         # انباشت اولیه → WATCH
         signal.phase = PumpPhase.ACCUMULATION
         signal.action = "WAIT"

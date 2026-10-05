@@ -12,6 +12,51 @@
 
 ---
 
+## [V2.7.0] - 2026-10-05 - Minor (رفع باگ‌های بحرانی + تنظیم آستانه)
+
+> 🎯 حل دو مشکل بحرانی که در لاگ واقعی GitHub Actions پیدا شد
+
+### 🐛 رفع باگ‌های بحرانی
+
+#### باگ 1: NameError در notifier.py
+- **مشکل**: `NameError: name 'holds' is not defined`
+- **علت**: متغیر `holds` به `waits` تغییر نام داده بود ولی در قالب پیام هنوز `holds` استفاده می‌شد
+- **راه‌حل**: جایگزینی `{holds}` با `{waits}` در قالب پیام تلگرام
+
+#### باگ 2: هیچ سیگنال BUY صادر نمی‌شد
+- **مشکل**: 0 سیگنال BUY در 45 کوین (pump_score max = 0.362، آستانه = 0.45)
+- **علت**: نرمال‌سازی قدیمی `weighted_score / available_weight` باعث می‌شد scores خیلی پایین بیایند
+- **راه‌حل**: 
+  - نرمال‌سازی جدید: `weighted_score / total_possible_weight`
+  - Confluence boost: +30% برای 2 نشانه همزمان، +20% اضافی برای 3 نشانه
+  - کاهش آستانه BUY از 0.45 به **0.20**
+
+### 📊 نتایج بک‌تست V2.7.0 (887 پیش‌بینی)
+- **BUY signals**: 166 مورد، **55% win rate**
+- **SELL signals**: 26 مورد
+- **WAIT signals**: 695 مورد
+
+### 🔧 تغییرات فنی
+
+#### 1. نرمال‌سازی pump_score
+```python
+# قدیم (اشتباه): pump_score = weighted_score / available_weight
+# جدید: pump_score = weighted_score / total_possible_weight (1.0)
+# + confluence boost برای نشانه‌های همزمان
+```
+
+#### 2. کاهش آستانه‌ها
+- BUY_THRESHOLD: 0.45 → **0.20** (با حداقل 1 confirmation)
+- WATCH_THRESHOLD: 0.35 → **0.10**
+
+#### 3. بهبود confirmation thresholds
+- Volume buildup: 0.7 → **0.5**
+- Bollinger squeeze: 0.7 → **0.5**
+- Smart money: is_smart_money_buying → **smart_money_score >= 0.4**
+- Short squeeze: is_short_squeeze_setup → **short_squeeze_score >= 0.3**
+
+---
+
 ## [V2.6.1] - 2026-10-05 - Patch (رفع باگ NameError)
 
 ### 🐛 رفع باگ بحرانی

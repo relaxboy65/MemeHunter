@@ -247,7 +247,7 @@ class Settings:
         "bonk", "wif", "bome", "myro", "slerf"
     )
 
-    REQUEST_DELAY: float = 0.6          # V1.4.2 - کاهش تأخیر بین درخواست‌ها
+    REQUEST_DELAY: float = 0.3          # V2.7.1 - کاهش از 0.6 به 0.3
     REQUEST_TIMEOUT: int = 12           # V1.4.2 - timeout کوتاه‌تر
     MAX_RETRIES: int = 3                # V1.4.2 - کمتر retry کلی
     # مخصوص تاریخچه CoinGecko: fail-fast تا اسکن گیر نکند
@@ -255,8 +255,8 @@ class Settings:
     CG_429_BASE_WAIT: float = 1.5       # به‌جای 5→25 ثانیه
     CG_429_MAX_WAIT: float = 4.0
     # تأخیر بین کوین‌ها وقتی تاریخچه از KuCoin آمده
-    INTER_COIN_DELAY_FAST: float = 0.15
-    INTER_COIN_DELAY_SLOW: float = 0.5
+    INTER_COIN_DELAY_FAST: float = 0.05   # V2.7.1 - کاهش از 0.15 به 0.05
+    INTER_COIN_DELAY_SLOW: float = 0.2    # V2.7.1 - کاهش از 0.5 به 0.2
     # === محدودیت نرخ پیشرفته (Token Bucket) ===
     ENABLE_RATE_LIMITER: bool = True
     RATE_LIMIT_CAPACITY: int = 12

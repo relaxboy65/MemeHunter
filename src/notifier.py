@@ -122,7 +122,7 @@ def format_summary_message(
     lines = [
         f"🎯 MemeHunter {settings.PROJECT_VERSION} — خلاصه اسکن",
         "━━━━━━━━━━━━━━━━━━━━",
-        f"🟢 خرید: {buys}   🔴 فروش: {sells}   🟡 نگه‌داری: {holds}",
+        f"🟢 خرید: {buys}   🔴 فروش: {sells}   🟡 صبر: {waits}",
         f"📊 کل: {len(results)}  |  ✅ داده واقعی: {real_count}",
     ]
     if run_meta and run_meta.get("duration_seconds"):
