@@ -255,8 +255,10 @@ class Settings:
     CG_429_BASE_WAIT: float = 1.5       # به‌جای 5→25 ثانیه
     CG_429_MAX_WAIT: float = 4.0
     # تأخیر بین کوین‌ها وقتی تاریخچه از KuCoin آمده
-    INTER_COIN_DELAY_FAST: float = 0.05   # V2.7.1 - کاهش از 0.15 به 0.05
-    INTER_COIN_DELAY_SLOW: float = 0.2    # V2.7.1 - کاهش از 0.5 به 0.2
+    INTER_COIN_DELAY_FAST: float = 0.0    # V2.9.0 - حذف تأخیر بین کوین‌ها
+    INTER_COIN_DELAY_SLOW: float = 0.1    # V2.9.0 - کاهش برای CoinGecko
+    # V2.9.0 - MTF غیرفعال برای سرعت (5s سربار هر کوین)
+    ENABLE_MTF: bool = False
     # === محدودیت نرخ پیشرفته (Token Bucket) ===
     ENABLE_RATE_LIMITER: bool = True
     RATE_LIMIT_CAPACITY: int = 12

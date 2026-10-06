@@ -1,4 +1,4 @@
-name: MemeHunter CI V2.8.0
+name: MemeHunter CI V2.9.0
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
       limit:
         description: "حداکثر تعداد کوین"
         required: false
-        default: "30"
+        default: "20"
       advanced:
         description: "تحلیل پیشرفته (true/false)"
         required: false
@@ -104,7 +104,7 @@ jobs:
       - name: Run MemeHunter scan
         run: |
           set -o pipefail
-          LIMIT="${{ github.event.inputs.limit || '30' }}"
+          LIMIT="${{ github.event.inputs.limit || '20' }}"
           ADVANCED="${{ github.event.inputs.advanced || 'true' }}"
           SEND_TG="${{ github.event.inputs.send_telegram || 'true' }}"
           CMD="python main.py --limit $LIMIT --format detailed --save --verbose"

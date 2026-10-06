@@ -597,9 +597,9 @@ def predict_pump(prices: List[float],
         signal.confidence = 0.7
         signal.expected_move_pct = recent_return / 2
         signal.signals.append("⚠️ در حال پامپ است - خرید دیر است، صبر کن تا تمام شود")
-    elif signal.pump_score >= 0.20 and signal.confirmations >= 1:
+    elif signal.pump_score >= 0.15 and signal.confirmations >= 1:
         # انباشت قابل توجه با حداقل 1 تأیید → BUY (قبل از پامپ)
-        # V2.7.0: آستانه 0.20 چون با نرمال‌سازی جدید، یک نشانه قوی ≈ 0.20-0.25
+        # V2.9.0: کاهش آستانه از 0.20 به 0.15 چون scores در عمل پایین هستند
         signal.phase = PumpPhase.READY_TO_PUMP
         signal.action = "BUY"
         signal.confidence = signal.pump_score
@@ -608,7 +608,7 @@ def predict_pump(prices: List[float],
         signal.entry_zone = (current_price * 0.98, current_price * 1.02)
         signal.stop_loss_pct = 0.08
         signal.take_profit_pct = 0.30
-    elif signal.pump_score >= 0.10:
+    elif signal.pump_score >= 0.08:
         # انباشت اولیه → WATCH
         signal.phase = PumpPhase.ACCUMULATION
         signal.action = "WAIT"
